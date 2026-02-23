@@ -153,6 +153,7 @@ end
 local function mathOp(op, a, b) return op == "-" and (a - b) or (a + b) end
 
 local function setFly(State)
+    if Util:GetState("Fly") == State then return end
     Util:SetState("Fly", State)
     if State then
         Keys_Pressed.W = 0
@@ -275,13 +276,27 @@ Misc_Spawn:Button("Reset Spawnpoint", function()
     SpawnpointLabel:UpdateAsset("Spawnpoint: Default")
 end, "Resets spawn point to default")
 
--- Misc: Keybinds — Fly на RightShift (как на скрине)
+-- Misc: Keybinds — Fly на RightShift (дебаунс чтобы не спамило и не двойное выключение)
 local Misc_Keybinds = MiscTab:Section("Keybinds")
+local lastFlyKeyTime = 0
 Misc_Keybinds:Keybind("Fly", Enum.KeyCode.RightShift, function()
+    if tick() - lastFlyKeyTime < 0.5 then return end
+    lastFlyKeyTime = tick()
     local newState = not Util:GetState("Fly")
     setFly(newState)
     pcall(function() FlyToggleRef:UpdateAsset(newState) end)
 end, "Toggle fly")
+-- Один обработчик RightShift в игре (библиотека иногда не дергает Keybind при фокусе в игре)
+local flyKeyConnection
+flyKeyConnection = game:GetService("UserInputService").InputBegan:Connect(function(Key, Typing)
+    if Typing then return end
+    if Key.KeyCode ~= Enum.KeyCode.RightShift then return end
+    if tick() - lastFlyKeyTime < 0.5 then return end
+    lastFlyKeyTime = tick()
+    local newState = not Util:GetState("Fly")
+    setFly(newState)
+    pcall(function() FlyToggleRef:UpdateAsset(newState) end)
+end)
 
 pcall(function()
     local gui = game:GetService("CoreGui"):FindFirstChild("XenonV3Lib")
