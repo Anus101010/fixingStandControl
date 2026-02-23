@@ -245,16 +245,16 @@ end, "Toggles custom dash")
 Misc_Dash:Slider("Dash Power", 10, 1000, 50, function(V) Util:SetInt("DashPower", V) end, false, "Set dash power")
 Misc_Dash:Slider("Dash Delay", 0, 3.5, 1, function(V) Util:SetInt("InfDelay", V) end, true, "Set dash delay")
 
--- Misc: Spawnpoint (логика из xenonv3_source)
-local Misc_Spawn = MiscTab:Section("Spawnpoint")
+-- Misc: Waypoint-секция, внутри только Spawnpoint (идея как в xenonv3_source: Waypoint + Spawnpoint в одной секции, сами waypoint не добавляем)
+local Misc_Waypoints = MiscTab:Section("Waypoint")
 local SpawnpointCF = nil
-local SpawnpointLabel = Misc_Spawn:Label("Spawnpoint: Default")
+local SpawnpointStatus = Misc_Waypoints:Label("Spawnpoint: Default")
 
-Misc_Spawn:Button("Set Spawnpoint", function()
+Misc_Waypoints:Button("Set Spawnpoint", function()
     local Char = Util:GetCharacter()
     if Char and Char.PrimaryPart then
         SpawnpointCF = Char.PrimaryPart.CFrame
-        SpawnpointLabel:UpdateAsset("Spawnpoint: " .. tostring(math.round(Char.PrimaryPart.Position.X)) .. ", " .. tostring(math.round(Char.PrimaryPart.Position.Y)) .. ", " .. tostring(math.round(Char.PrimaryPart.Position.Z)))
+        SpawnpointStatus:UpdateAsset("Spawnpoint: " .. tostring(math.round(Char.PrimaryPart.Position.X)) .. ", " .. tostring(math.round(Char.PrimaryPart.Position.Y)) .. ", " .. tostring(math.round(Char.PrimaryPart.Position.Z)))
         Util:AddTask("Spawnpoint", Util:GetPlayer().CharacterAdded:Connect(function(Chara)
             task.wait(0.15)
             if Chara and Chara.PrimaryPart and SpawnpointCF then
@@ -264,10 +264,10 @@ Misc_Spawn:Button("Set Spawnpoint", function()
     end
 end, "Sets your waypoint to your current position.")
 
-Misc_Spawn:Button("Reset Spawnpoint", function()
+Misc_Waypoints:Button("Reset Spawnpoint", function()
     Util:DisconnectTask("Spawnpoint")
     SpawnpointCF = nil
-    SpawnpointLabel:UpdateAsset("Spawnpoint: Default")
+    SpawnpointStatus:UpdateAsset("Spawnpoint: Default")
 end, "Resets your spawn point to default spawns.")
 
 -- Misc: Keybinds — Fly на RightShift (как в xenonv3_source: только переключает тогл в UI)
