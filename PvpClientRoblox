@@ -1,5 +1,5 @@
 -- Player: Auto Sprint, Player ESP, Character Modifications (Player Fly + Fly Speed)
--- Misc: Dash, Map (No-Clip), Keybinds (Fly = RightShift)
+-- Misc: Dash, Map (No-Clip), Keybinds (Fly = RightShift, No-Clip = RightAlt)
 
 local Xenon = { Utils = {} }
 Xenon.__index = Xenon
@@ -90,7 +90,6 @@ end
 local Util = Xenon.Utils.MakeUtilController()
 Util.States["Auto Sprinting"] = { Value = false }
 Util.States["Infinite Dash"] = { Value = false }
-Util.States["Fly"] = { Value = false }
 Util.Ints["InfTick"] = { Value = tick() }
 Util.Ints["InfDelay"] = { Value = 1 }
 Util.Ints["DashPower"] = { Value = 50 }
@@ -117,23 +116,30 @@ Player_Section:Toggle("Auto Sprint", false, function(State)
     end
 end, "Toggles auto sprint")
 
+local ESPChrTaskNames = {}
 Player_Section:Toggle("Player ESP", false, function(State)
     if State then
         local core = Util:GetService("CoreGui")
         if not core:FindFirstChild("GayESP") then Instance.new("Folder", core).Name = "GayESP" end
         for _, v in pairs(Util:GetService("Players"):GetPlayers()) do
             if v ~= Util:GetPlayer() then
-                Util:AddTask("Chr", v.CharacterAdded:Connect(function(ch) Util:Outline(ch) Util:LabelChar(ch) end))
+                local taskName = "Chr_" .. v.UserId
+                Util:AddTask(taskName, v.CharacterAdded:Connect(function(ch) Util:Outline(ch) Util:LabelChar(ch) end))
+                table.insert(ESPChrTaskNames, taskName)
                 if v.Character then Util:Outline(v.Character) Util:LabelChar(v.Character) end
             end
         end
         Util:AddTask("Chr2", Util:GetService("Players").PlayerAdded:Connect(function(p)
-            p.CharacterAdded:Connect(function(ch) Util:Outline(ch) Util:LabelChar(ch) end)
+            local taskName = "Chr_" .. p.UserId
+            Util:AddTask(taskName, p.CharacterAdded:Connect(function(ch) Util:Outline(ch) Util:LabelChar(ch) end))
+            table.insert(ESPChrTaskNames, taskName)
         end))
     else
         local g = Util:GetService("CoreGui"):FindFirstChild("GayESP")
         if g then g:Destroy() end
-        Util:DisconnectTask("Chr") Util:DisconnectTask("Chr2")
+        for _, taskName in ipairs(ESPChrTaskNames) do Util:DisconnectTask(taskName) end
+        ESPChrTaskNames = {}
+        Util:DisconnectTask("Chr2")
     end
 end, "Turns on name ESP for players")
 
@@ -248,8 +254,9 @@ Misc_Dash:Slider("Dash Delay", 0, 3.5, 1, function(V) Util:SetInt("InfDelay", V)
 
 -- Misc: Map — No-Clip из xenonv3_source (Destroy Map не добавляем)
 local Misc_Map = MiscTab:Section("Map")
-Misc_Map:Toggle("No-Clip", false, function(State)
+local NoClipToggleRef = Misc_Map:Toggle("No-Clip", false, function(State)
     if State == true then
+        Library:Notification("No-Clip", "No-Clip enabled!", 3)
         local NoClipCache = {}
         local cachedChar = nil
         Util:AddTask("No-Clip", game:GetService("RunService").RenderStepped:Connect(function()
@@ -273,11 +280,12 @@ Misc_Map:Toggle("No-Clip", false, function(State)
             end)
         end))
     else
+        Library:Notification("No-Clip", "No-Clip disabled!", 3)
         Util:DisconnectTask("No-Clip")
     end
 end, "Enables noclip (or disables)")
 
--- Misc: Keybinds — Fly на RightShift (как в xenonv3_source: только переключает тогл в UI)
+-- Misc: Keybinds — Fly = RightShift, No-Clip = RightAlt (переключают тоглы в UI + уведомления 3 сек)
 local Misc_Keybinds = MiscTab:Section("Keybinds")
 Misc_Keybinds:Keybind("Fly", Enum.KeyCode.RightShift, function()
     if Util:IsTaskRunning("FlyLoop") == nil or not Util:IsTaskRunning("FlyLoop") then
@@ -286,6 +294,13 @@ Misc_Keybinds:Keybind("Fly", Enum.KeyCode.RightShift, function()
         pcall(function() FlyToggleRef:UpdateAsset(false) end)
     end
 end, "Toggle fly")
+Misc_Keybinds:Keybind("No-Clip", Enum.KeyCode.RightAlt, function()
+    if Util:IsTaskRunning("No-Clip") == nil or not Util:IsTaskRunning("No-Clip") then
+        pcall(function() NoClipToggleRef:UpdateAsset(true) end)
+    else
+        pcall(function() NoClipToggleRef:UpdateAsset(false) end)
+    end
+end, "Toggle noclip")
 
 pcall(function()
     local gui = game:GetService("CoreGui"):FindFirstChild("XenonV3Lib")
