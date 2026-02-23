@@ -155,12 +155,21 @@ local function mathOp(op, a, b) return op == "-" and (a - b) or (a + b) end
 local function setFly(State)
     Util:SetState("Fly", State)
     if State then
-        Util:AddTask("FlyKeyB", game:GetService("UserInputService").InputBegan:Connect(function(Key, Typing)
+        Keys_Pressed.W = 0
+        Keys_Pressed.A = 0
+        Keys_Pressed.S = 0
+        Keys_Pressed.D = 0
+        local UIS = game:GetService("UserInputService")
+        if UIS:IsKeyDown(Enum.KeyCode.W) then Keys_Pressed.W = 1 end
+        if UIS:IsKeyDown(Enum.KeyCode.A) then Keys_Pressed.A = 1 end
+        if UIS:IsKeyDown(Enum.KeyCode.S) then Keys_Pressed.S = 1 end
+        if UIS:IsKeyDown(Enum.KeyCode.D) then Keys_Pressed.D = 1 end
+        Util:AddTask("FlyKeyB", UIS.InputBegan:Connect(function(Key, Typing)
             if Typing then return end
             local k = Key.KeyCode.Name
             if Keys_Pressed[k] ~= nil then Keys_Pressed[k] = 1 end
         end))
-        Util:AddTask("FlyKeyE", game:GetService("UserInputService").InputEnded:Connect(function(Key, Typing)
+        Util:AddTask("FlyKeyE", UIS.InputEnded:Connect(function(Key, Typing)
             if Typing then return end
             local k = Key.KeyCode.Name
             if Keys_Pressed[k] ~= nil then Keys_Pressed[k] = 0 end
@@ -191,17 +200,22 @@ local function setFly(State)
                     if val == 1 and Key_Info[key] then vel = mathOp(Key_Info[key].op, vel, horse.PrimaryPart.CFrame[Key_Info[key].dir] * (Util:GetInt("FlySpeed") * 25) * mass) end
                 end
                 horse.PrimaryPart.Velocity = vel
-            end
+                end
         end))
+        Library:Notification("Player Fly", "Fly enabled!", 1.9)
     else
         Util:DisconnectTask("FlyLoop")
         Util:DisconnectTask("FlyKeyB")
         Util:DisconnectTask("FlyKeyE")
-        if Util:GetHumanoid() then Util:GetHumanoid().WalkSpeed = 16 end
+        local hum = Util:GetHumanoid()
+        if hum then hum.WalkSpeed = 16 end
+        Library:Notification("Player Fly", "Fly disabled!", 1.9)
     end
 end
 
-local FlyToggleRef = Player_CM:Toggle("Player Fly", false, function(State) setFly(State) end, "Toggles player fly")
+local FlyToggleRef = Player_CM:Toggle("Player Fly", false, function(State)
+    setFly(State)
+end, "Toggles player fly")
 Player_CM:Slider("Fly Speed", 0.1, 1, 0.5, function(V) Util:SetInt("FlySpeed", V) end, true, "changes fly speed")
 
 -- Misc: Dash + Spawnpoint + Keybinds
@@ -261,13 +275,21 @@ Misc_Spawn:Button("Reset Spawnpoint", function()
     SpawnpointLabel:UpdateAsset("Spawnpoint: Default")
 end, "Resets spawn point to default")
 
--- Misc: Keybinds — Fly на RightShift (как на скрине)
+-- Misc: Keybinds — Fly на RightShift (как на скрине). Обработка нажатия RightShift в игре.
 local Misc_Keybinds = MiscTab:Section("Keybinds")
 Misc_Keybinds:Keybind("Fly", Enum.KeyCode.RightShift, function()
     local newState = not Util:GetState("Fly")
     setFly(newState)
-    FlyToggleRef:UpdateAsset(newState)
+    pcall(function() FlyToggleRef:UpdateAsset(newState) end)
 end, "Toggle fly")
+game:GetService("UserInputService").InputBegan:Connect(function(Key, Typing)
+    if Typing then return end
+    if Key.KeyCode == Enum.KeyCode.RightShift then
+        local newState = not Util:GetState("Fly")
+        setFly(newState)
+        pcall(function() FlyToggleRef:UpdateAsset(newState) end)
+    end
+end)
 
 pcall(function()
     local gui = game:GetService("CoreGui"):FindFirstChild("XenonV3Lib")
