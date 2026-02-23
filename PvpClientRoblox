@@ -245,7 +245,7 @@ end, "Toggles custom dash")
 Misc_Dash:Slider("Dash Power", 10, 1000, 50, function(V) Util:SetInt("DashPower", V) end, false, "Set dash power")
 Misc_Dash:Slider("Dash Delay", 0, 3.5, 1, function(V) Util:SetInt("InfDelay", V) end, true, "Set dash delay")
 
--- Misc: Spawnpoint — по xenonv3_source: отключение старого таска, ожидание HRP, применение CFrame
+-- Misc: Spawnpoint — после респавна держим позицию ~1 сек, чтобы игра не перезаписала
 local Misc_Spawnpoint = MiscTab:Section("Spawnpoint")
 local Cache = { ["Spawnpoint"] = nil }
 
@@ -264,11 +264,24 @@ Misc_Spawnpoint:Button("Set Spawnpoint", function()
     SpawnpointStatus:UpdateAsset("Spawnpoint: " .. tostring(math.round(cf.Position.X)) .. ", " .. tostring(math.round(cf.Position.Y)) .. ", " .. tostring(math.round(cf.Position.Z)))
     Util:DisconnectTask("Spawnpoint")
     Util:AddTask("Spawnpoint", Util:GetPlayer().CharacterAdded:Connect(function(Chara)
-        task.wait(0.15)
         local sp = Cache["Spawnpoint"]
         if not sp then return end
-        local r = Chara:WaitForChild("HumanoidRootPart", 2) or Chara:FindFirstChild("PrimaryPart")
-        if r then r.CFrame = sp end
+        task.wait(0.25)
+        local r = Chara:WaitForChild("HumanoidRootPart", 3) or getRootPart(Chara)
+        if not r or not r.Parent then return end
+        local RunService = game:GetService("RunService")
+        local deadline = tick() + 1.2
+        local conn
+        conn = RunService.Heartbeat:Connect(function()
+            if tick() > deadline then
+                conn:Disconnect()
+                return
+            end
+            if Chara.Parent and r.Parent then
+                r.CFrame = sp
+            end
+        end)
+        task.delay(1.2, function() pcall(function() conn:Disconnect() end) end)
     end))
 end, "Sets your spawnpoint to your current position.")
 
