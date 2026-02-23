@@ -1,5 +1,5 @@
 -- Player: Auto Sprint, Player ESP, Character Modifications (Player Fly + Fly Speed)
--- Misc: Dash, Keybinds (Fly = RightShift)
+-- Misc: Dash, Map (No-Clip), Keybinds (Fly = RightShift)
 
 local Xenon = { Utils = {} }
 Xenon.__index = Xenon
@@ -119,7 +119,8 @@ end, "Toggles auto sprint")
 
 Player_Section:Toggle("Player ESP", false, function(State)
     if State then
-        Instance.new("Folder", Util:GetService("CoreGui")).Name = "GayESP"
+        local core = Util:GetService("CoreGui")
+        if not core:FindFirstChild("GayESP") then Instance.new("Folder", core).Name = "GayESP" end
         for _, v in pairs(Util:GetService("Players"):GetPlayers()) do
             if v ~= Util:GetPlayer() then
                 Util:AddTask("Chr", v.CharacterAdded:Connect(function(ch) Util:Outline(ch) Util:LabelChar(ch) end))
@@ -207,12 +208,12 @@ local FlyToggleRef = Player_CM:Toggle("Player Fly", false, function(State)
         Util:DisconnectTask("FlyThingy")
         Util:DisconnectTask("FlyThingy2")
         local hum = Util:GetHumanoid()
-        if hum then hum.WalkSpeed = 16 end
+        if hum then hum.WalkSpeed = 16 hum.JumpPower = 50 end
     end
 end, "Toggles player fly")
 Player_CM:Slider("Fly Speed", 0.1, 1, 0.5, function(V) Util:SetInt("FlySpeed", V) end, true, "changes fly speed")
 
--- Misc: Dash + Keybinds
+-- Misc: Dash, Map (No-Clip), Keybinds
 local Misc_Dash = MiscTab:Section("Dash")
 local DashAnimsFolder = Instance.new("Folder", workspace)
 
@@ -244,6 +245,37 @@ end, "Toggles custom dash")
 
 Misc_Dash:Slider("Dash Power", 10, 1000, 50, function(V) Util:SetInt("DashPower", V) end, false, "Set dash power")
 Misc_Dash:Slider("Dash Delay", 0, 3.5, 1, function(V) Util:SetInt("InfDelay", V) end, true, "Set dash delay")
+
+-- Misc: Map — No-Clip из xenonv3_source (Destroy Map не добавляем)
+local Misc_Map = MiscTab:Section("Map")
+Misc_Map:Toggle("No-Clip", false, function(State)
+    if State == true then
+        local NoClipCache = {}
+        local cachedChar = nil
+        Util:AddTask("No-Clip", game:GetService("RunService").RenderStepped:Connect(function()
+            pcall(function()
+                local char = Util:GetCharacter()
+                if not char then return end
+                if cachedChar ~= char then
+                    cachedChar = char
+                    table.clear(NoClipCache)
+                end
+                if #NoClipCache == 0 then
+                    for _, Part in char:GetChildren() do
+                        if Part:IsA("BasePart") or Part:IsA("UnionOperation") then
+                            table.insert(NoClipCache, Part)
+                        end
+                    end
+                end
+                for _, Part in NoClipCache do
+                    if Part.Parent then Part.CanCollide = false end
+                end
+            end)
+        end))
+    else
+        Util:DisconnectTask("No-Clip")
+    end
+end, "Enables noclip (or disables)")
 
 -- Misc: Keybinds — Fly на RightShift (как в xenonv3_source: только переключает тогл в UI)
 local Misc_Keybinds = MiscTab:Section("Keybinds")
