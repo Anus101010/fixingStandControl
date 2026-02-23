@@ -1,5 +1,5 @@
 -- Player: Auto Sprint, Player ESP, Character Modifications (Player Fly + Fly Speed)
--- Misc: Dash, Waypoint, Keybinds (Fly = RightShift)
+-- Misc: Dash, Spawnpoint, Keybinds (Fly = RightShift)
 
 local Xenon = { Utils = {} }
 Xenon.__index = Xenon
@@ -246,7 +246,7 @@ Misc_Dash:Slider("Dash Power", 10, 1000, 50, function(V) Util:SetInt("DashPower"
 Misc_Dash:Slider("Dash Delay", 0, 3.5, 1, function(V) Util:SetInt("InfDelay", V) end, true, "Set dash delay")
 
 -- Misc: Waypoint — полная вкладка из xenonv3_source (Waypoint + Spawnpoint)
-local Misc_Waypoints = MiscTab:Section("Waypoint")
+local Misc_Waypoints = MiscTab:Section("Spawnpoint")
 local Cache = { ["Waypoint"] = nil, ["Spawnpoint"] = nil }
 
 local WaypointStatus = Misc_Waypoints:Label("Waypoint: None")
