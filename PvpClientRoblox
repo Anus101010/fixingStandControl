@@ -1,4 +1,5 @@
--- ТОЛЬКО: Player (Auto Sprint, Player ESP) + Misc (Infinite Dash, Dash Power, Dash Delay). Больше ничего.
+-- Player: Auto Sprint, Player ESP, Character Modifications (Player Fly + Fly Speed)
+-- Misc: Dash, Spawnpoint, Keybinds (Fly = RightShift)
 
 local Xenon = { Utils = {} }
 Xenon.__index = Xenon
@@ -33,6 +34,10 @@ end
 function Xenon.Utils:GetHRP()
     local c = self:GetCharacter()
     return c and c:FindFirstChild("HumanoidRootPart")
+end
+function Xenon.Utils:GetHorse()
+    local n = self:GetPlayer().Name
+    return workspace:FindFirstChild(n .. "'s Horse")
 end
 function Xenon.Utils:GetState(Value) return self.States[Value] and self.States[Value].Value end
 function Xenon.Utils:SetState(Value, NewValue) if self.States[Value] then self.States[Value].Value = NewValue end end
@@ -85,9 +90,11 @@ end
 local Util = Xenon.Utils.MakeUtilController()
 Util.States["Auto Sprinting"] = { Value = false }
 Util.States["Infinite Dash"] = { Value = false }
+Util.States["Fly"] = { Value = false }
 Util.Ints["InfTick"] = { Value = tick() }
 Util.Ints["InfDelay"] = { Value = 1 }
 Util.Ints["DashPower"] = { Value = 50 }
+Util.Ints["FlySpeed"] = { Value = 0.5 }
 
 local Lib = Library.CreateLib()
 local PlayerTab = Lib:Tab("Player", 6023426915)
@@ -129,7 +136,75 @@ Player_Section:Toggle("Player ESP", false, function(State)
     end
 end, "Turns on name ESP for players")
 
--- Misc: только Infinite Dash + Dash Power + Dash Delay
+-- Character Modifications: Player Fly + Fly Speed
+local Player_CM = PlayerTab:Section("Character Modifications")
+local Keys_Pressed = { W = 0, A = 0, S = 0, D = 0 }
+local Key_Info = {
+    W = { op = "+", dir = "LookVector" },
+    A = { op = "-", dir = "RightVector" },
+    S = { op = "-", dir = "LookVector" },
+    D = { op = "+", dir = "RightVector" },
+}
+local function getMass(model)
+    local m = 0
+    for _, v in pairs(model:GetDescendants()) do if v:IsA("BasePart") then m = m + v:GetMass() end end
+    return m
+end
+local function mathOp(op, a, b) return op == "-" and (a - b) or (a + b) end
+
+local function setFly(State)
+    Util:SetState("Fly", State)
+    if State then
+        Util:AddTask("FlyKeyB", game:GetService("UserInputService").InputBegan:Connect(function(Key, Typing)
+            if Typing then return end
+            local k = Key.KeyCode.Name
+            if Keys_Pressed[k] ~= nil then Keys_Pressed[k] = 1 end
+        end))
+        Util:AddTask("FlyKeyE", game:GetService("UserInputService").InputEnded:Connect(function(Key, Typing)
+            if Typing then return end
+            local k = Key.KeyCode.Name
+            if Keys_Pressed[k] ~= nil then Keys_Pressed[k] = 0 end
+        end))
+        Util:AddTask("FlyLoop", game:GetService("RunService").RenderStepped:Connect(function()
+            local horse = Util:GetHorse()
+            local char = Util:GetCharacter()
+            local hrp = Util:GetHRP()
+            if not hrp then return end
+            if not horse or horse.Seat.Occupant ~= char:FindFirstChildWhichIsA("Humanoid") then
+                Util:GetHumanoid().WalkSpeed = 0
+                Util:GetHumanoid().JumpPower = 0
+                hrp.CFrame = CFrame.new(hrp.Position, hrp.Position + workspace.CurrentCamera.CFrame.LookVector)
+                local mass = getMass(char)
+                local vel = Vector3.new(0, mass / workspace.Gravity, 0)
+                for key, val in pairs(Keys_Pressed) do
+                    if val == 1 and Key_Info[key] then vel = mathOp(Key_Info[key].op, vel, hrp.CFrame[Key_Info[key].dir] * (Util:GetInt("FlySpeed") * 25) * mass) end
+                end
+                hrp.Velocity = vel
+            else
+                horse.Humanoid.WalkSpeed = 0
+                horse.Humanoid.JumpPower = 0
+                if horse:FindFirstChild("Speed") then horse.Speed.Value = 0 end
+                horse.PrimaryPart.CFrame = CFrame.new(horse.PrimaryPart.Position, horse.PrimaryPart.Position + workspace.CurrentCamera.CFrame.LookVector)
+                local mass = getMass(horse)
+                local vel = Vector3.new(0, mass / workspace.Gravity, 0)
+                for key, val in pairs(Keys_Pressed) do
+                    if val == 1 and Key_Info[key] then vel = mathOp(Key_Info[key].op, vel, horse.PrimaryPart.CFrame[Key_Info[key].dir] * (Util:GetInt("FlySpeed") * 25) * mass) end
+                end
+                horse.PrimaryPart.Velocity = vel
+            end
+        end))
+    else
+        Util:DisconnectTask("FlyLoop")
+        Util:DisconnectTask("FlyKeyB")
+        Util:DisconnectTask("FlyKeyE")
+        if Util:GetHumanoid() then Util:GetHumanoid().WalkSpeed = 16 end
+    end
+end
+
+local FlyToggleRef = Player_CM:Toggle("Player Fly", false, function(State) setFly(State) end, "Toggles player fly")
+Player_CM:Slider("Fly Speed", 0.1, 1, 0.5, function(V) Util:SetInt("FlySpeed", V) end, true, "changes fly speed")
+
+-- Misc: Dash + Spawnpoint + Keybinds
 local Misc_Dash = MiscTab:Section("Dash")
 local DashAnimsFolder = Instance.new("Folder", workspace)
 
@@ -161,6 +236,38 @@ end, "Toggles custom dash")
 
 Misc_Dash:Slider("Dash Power", 10, 1000, 50, function(V) Util:SetInt("DashPower", V) end, false, "Set dash power")
 Misc_Dash:Slider("Dash Delay", 0, 3.5, 1, function(V) Util:SetInt("InfDelay", V) end, true, "Set dash delay")
+
+-- Misc: Spawnpoint (как на скрине — Spawnpoint: Default, Set Spawnpoint, Reset Spawnpoint)
+local Misc_Spawn = MiscTab:Section("Spawnpoint")
+local SpawnpointCF = nil
+local SpawnpointLabel = Misc_Spawn:Label("Spawnpoint: Default")
+
+Misc_Spawn:Button("Set Spawnpoint", function()
+    local c = Util:GetCharacter()
+    if c and c.PrimaryPart then
+        SpawnpointCF = c.PrimaryPart.CFrame
+        SpawnpointLabel:UpdateAsset("Spawnpoint: " .. math.round(c.PrimaryPart.Position.X) .. ", " .. math.round(c.PrimaryPart.Position.Y) .. ", " .. math.round(c.PrimaryPart.Position.Z))
+        Util:DisconnectTask("SpawnpointTP")
+        Util:AddTask("SpawnpointTP", Util:GetPlayer().CharacterAdded:Connect(function(ch)
+            task.wait(0.15)
+            if ch.PrimaryPart and SpawnpointCF then ch.PrimaryPart.CFrame = SpawnpointCF end
+        end))
+    end
+end, "Sets spawnpoint to current position")
+
+Misc_Spawn:Button("Reset Spawnpoint", function()
+    Util:DisconnectTask("SpawnpointTP")
+    SpawnpointCF = nil
+    SpawnpointLabel:UpdateAsset("Spawnpoint: Default")
+end, "Resets spawn point to default")
+
+-- Misc: Keybinds — Fly на RightShift (как на скрине)
+local Misc_Keybinds = MiscTab:Section("Keybinds")
+Misc_Keybinds:Keybind("Fly", Enum.KeyCode.RightShift, function()
+    local newState = not Util:GetState("Fly")
+    setFly(newState)
+    FlyToggleRef:UpdateAsset(newState)
+end, "Toggle fly")
 
 pcall(function()
     local gui = game:GetService("CoreGui"):FindFirstChild("XenonV3Lib")
