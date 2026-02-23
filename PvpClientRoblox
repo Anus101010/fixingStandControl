@@ -140,7 +140,7 @@ end, "Turns on name ESP for players")
 local Player_CM = PlayerTab:Section("Character Modifications")
 local FlyToggleRef = Player_CM:Toggle("Player Fly", false, function(State)
     if State == true then
-        Library:Notification("Player Fly", "Fly enabled!", 5)
+        Library:Notification("Player Fly", "Fly enabled!", 3.33)
         local Keys_Pressed = {
             ["W"] = 0;
             ["A"] = 0;
@@ -202,7 +202,7 @@ local FlyToggleRef = Player_CM:Toggle("Player Fly", false, function(State)
             end
         end))
     else
-        Library:Notification("Player Fly", "Fly disabled!", 5)
+        Library:Notification("Player Fly", "Fly disabled!", 3.33)
         Util:DisconnectTask("FlyLoop")
         Util:DisconnectTask("FlyThingy")
         Util:DisconnectTask("FlyThingy2")
