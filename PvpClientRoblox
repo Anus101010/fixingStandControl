@@ -212,7 +212,7 @@ local FlyToggleRef = Player_CM:Toggle("Player Fly", false, function(State)
 end, "Toggles player fly")
 Player_CM:Slider("Fly Speed", 0.1, 1, 0.5, function(V) Util:SetInt("FlySpeed", V) end, true, "changes fly speed")
 
--- Misc: Dash + Spawnpoint + Keybinds
+-- Misc: Dash + Keybinds
 local Misc_Dash = MiscTab:Section("Dash")
 local DashAnimsFolder = Instance.new("Folder", workspace)
 
