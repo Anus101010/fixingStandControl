@@ -245,30 +245,13 @@ end, "Toggles custom dash")
 Misc_Dash:Slider("Dash Power", 10, 1000, 50, function(V) Util:SetInt("DashPower", V) end, false, "Set dash power")
 Misc_Dash:Slider("Dash Delay", 0, 3.5, 1, function(V) Util:SetInt("InfDelay", V) end, true, "Set dash delay")
 
--- Misc: Waypoint — полная вкладка из xenonv3_source (Waypoint + Spawnpoint)
-local Misc_Waypoints = MiscTab:Section("Spawnpoint")
-local Cache = { ["Waypoint"] = nil, ["Spawnpoint"] = nil }
+-- Misc: Spawnpoint — только спавнпоинт из xenonv3_source (Waypoint убран)
+local Misc_Spawnpoint = MiscTab:Section("Spawnpoint")
+local Cache = { ["Spawnpoint"] = nil }
 
-local WaypointStatus = Misc_Waypoints:Label("Waypoint: None")
+local SpawnpointStatus = Misc_Spawnpoint:Label("Spawnpoint: Default")
 
-Misc_Waypoints:Button("Set Waypoint", function()
-    local Char = Util:GetCharacter()
-    if Char and Char.PrimaryPart then
-        Cache["Waypoint"] = Char.PrimaryPart.CFrame
-        WaypointStatus:UpdateAsset("Waypoint: " .. tostring(math.round(Char.PrimaryPart.Position.X)) .. ", " .. tostring(math.round(Char.PrimaryPart.Position.Y)) .. ", " .. tostring(math.round(Char.PrimaryPart.Position.Z)))
-    end
-end, "Sets your waypoint to your current position.")
-
-Misc_Waypoints:Button("Go to waypoint", function()
-    local Char = Util:GetCharacter()
-    if Cache["Waypoint"] ~= nil and Char and Char.PrimaryPart then
-        Char.PrimaryPart.CFrame = Cache["Waypoint"]
-    end
-end, "Teleports you to your current waypoint")
-
-local SpawnpointStatus = Misc_Waypoints:Label("Spawnpoint: Default")
-
-Misc_Waypoints:Button("Set Spawnpoint", function()
+Misc_Spawnpoint:Button("Set Spawnpoint", function()
     local Char = Util:GetCharacter()
     if Char and Char.PrimaryPart then
         Cache["Spawnpoint"] = Char.PrimaryPart.CFrame
@@ -280,9 +263,9 @@ Misc_Waypoints:Button("Set Spawnpoint", function()
             end
         end))
     end
-end, "Sets your waypoint to your current position.")
+end, "Sets your spawnpoint to your current position.")
 
-Misc_Waypoints:Button("Reset Spawnpoint", function()
+Misc_Spawnpoint:Button("Reset Spawnpoint", function()
     Util:DisconnectTask("Spawnpoint")
     Cache["Spawnpoint"] = nil
     SpawnpointStatus:UpdateAsset("Spawnpoint: Default")
