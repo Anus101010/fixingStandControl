@@ -1,10 +1,21 @@
-if not workspace:FindFirstChild("Locations") then
-    local LocationsFolder = Instance.new("Folder")
-    LocationsFolder.Name = "Locations"
-    LocationsFolder.Parent = workspace
+-- 1) Сразу создаём Locations и не даём игре его "потерять"
+do
+    local function ensureLocations()
+        if not workspace:FindFirstChild("Locations") then
+            local f = Instance.new("Folder")
+            f.Name = "Locations"
+            f.Parent = workspace
+        end
+    end
+    ensureLocations()
+    task.spawn(function()
+        while true do
+            task.wait(0.5)
+            ensureLocations()
+        end
+    end)
 end
 
--- После блока с Locations добавь:
 pcall(function()
     local black = game:GetService("Players").LocalPlayer:FindFirstChild("PlayerGui") and game:GetService("Players").LocalPlayer.PlayerGui:FindFirstChild("BlackScreen")
     if black then
