@@ -4,6 +4,18 @@ if not workspace:FindFirstChild("Locations") then
     LocationsFolder.Parent = workspace
 end
 
+-- После блока с Locations добавь:
+pcall(function()
+    local black = game:GetService("Players").LocalPlayer:FindFirstChild("PlayerGui") and game:GetService("Players").LocalPlayer.PlayerGui:FindFirstChild("BlackScreen")
+    if black then
+        local te = black:FindFirstChild("TimeErase") or Instance.new("Frame")
+        if te.Name ~= "TimeErase" then te.Name = "TimeErase"; te.Parent = black end
+        if not te:FindFirstChild("TE1") then
+            local te1 = Instance.new("Frame"); te1.Name = "TE1"; te1.Parent = te
+        end
+    end
+end)
+
 if game.PlaceId ~= 2809202155 then
     local Folder = Instance.new("Folder", workspace)
     Folder.Name = "Item_Spawns"
