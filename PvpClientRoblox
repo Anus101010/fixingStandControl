@@ -1,5 +1,5 @@
 -- Player: Auto Sprint, Player ESP, Character Modifications (Player Fly + Fly Speed)
--- Misc: Dash, Map (No-Clip), Keybinds (Fly = RightShift, No-Clip = RightAlt)
+-- Misc: Dash, Map (No-Clip), Keybinds (Fly = RightShift, No-Clip = Insert)
 
 local Xenon = { Utils = {} }
 Xenon.__index = Xenon
@@ -63,7 +63,9 @@ function Xenon.Utils:GetStroke()
 end
 
 function Xenon.Utils:Outline(Chars)
-    local h = Instance.new("Highlight", self:GetService("CoreGui").GayESP)
+    local gay = self:GetService("CoreGui"):FindFirstChild("GayESP")
+    if not gay then return end
+    local h = Instance.new("Highlight", gay)
     h.OutlineColor = Color3.fromRGB(255,255,255)
     h.Adornee = Chars
     h.FillColor = Color3.fromRGB(255,255,255)
@@ -71,7 +73,9 @@ function Xenon.Utils:Outline(Chars)
 end
 
 function Xenon.Utils:LabelChar(Chars)
-    local bg = Instance.new("BillboardGui", self:GetService("CoreGui").GayESP)
+    local gay = self:GetService("CoreGui"):FindFirstChild("GayESP")
+    if not gay then return end
+    local bg = Instance.new("BillboardGui", gay)
     local fr = Instance.new("Frame", bg)
     local lb = Instance.new("TextLabel", fr)
     bg.Adornee = Chars:WaitForChild("Head")
@@ -184,16 +188,18 @@ local FlyToggleRef = Player_CM:Toggle("Player Fly", false, function(State)
             if Keys_Pressed[Key_String] ~= nil then Keys_Pressed[Key_String] = 0 end
         end))
         Util:AddTask("FlyLoop", game:GetService("RunService").RenderStepped:Connect(function()
+            local hum, hrp = Util:GetHumanoid(), Util:GetHRP()
+            if not hum or not hrp then return end
             if Util:GetHorse() == nil or Util:GetHorse().Seat.Occupant ~= Util:GetCharacter():FindFirstChildWhichIsA("Humanoid") then
-                Util:GetHumanoid().WalkSpeed = 0
-                Util:GetHumanoid().JumpPower = 0
-                Util:GetHRP().CFrame = CFrame.new(Util:GetHRP().Position, Util:GetHRP().Position + workspace.CurrentCamera.CFrame.LookVector)
+                hum.WalkSpeed = 0
+                hum.JumpPower = 0
+                hrp.CFrame = CFrame.new(hrp.Position, hrp.Position + workspace.CurrentCamera.CFrame.LookVector)
                 local CharacterMass = GetMass(Util:GetCharacter())
                 local Velocity = Vector3.new(0, CharacterMass / workspace.Gravity, 0)
                 for i, v in pairs(Keys_Pressed) do
-                    if v ~= 0 and Key_Info[i] then Velocity = Math(Key_Info[i].Operator, Velocity, Util:GetHRP().CFrame[Key_Info[i].Direction] * (Util:GetInt("FlySpeed") * 25) * CharacterMass) end
+                    if v ~= 0 and Key_Info[i] then Velocity = Math(Key_Info[i].Operator, Velocity, hrp.CFrame[Key_Info[i].Direction] * (Util:GetInt("FlySpeed") * 25) * CharacterMass) end
                 end
-                Util:GetHRP().Velocity = Velocity
+                hrp.Velocity = Velocity
             elseif Util:GetHorse() ~= nil and Util:GetHorse().Seat.Occupant == Util:GetCharacter():FindFirstChildWhichIsA("Humanoid") then
                 local horse = Util:GetHorse()
                 horse.Humanoid.WalkSpeed = 0
@@ -233,13 +239,15 @@ Misc_Dash:Toggle("Infinite Dash", false, function(State)
             local dk = plr:FindFirstChild("PlayerStats") and plr.PlayerStats:FindFirstChild("DashKey")
             if not dk then return end
             if Input.KeyCode == Enum.KeyCode[dk.Value] and (tick() - Util:GetInt("InfTick")) >= Util:GetInt("InfDelay") then
+                local dashHum, dashHrp = Util:GetHumanoid(), Util:GetHRP()
+                if not dashHum or not dashHrp then return end
                 Util:SetInt("InfTick", tick())
                 local Dir, AnimId = Util:GetStroke()
                 local anim = Instance.new("Animation", DashAnimsFolder)
                 anim.AnimationId = "rbxassetid://" .. AnimId
-                Util:GetHumanoid():LoadAnimation(anim):Play()
-                local bv = Instance.new("BodyVelocity", Util:GetHRP())
-                bv.Velocity = (Util:GetHRP().CFrame * CFrame.Angles(0, math.rad(Dir), 0)).LookVector * Util:GetInt("DashPower")
+                dashHum:LoadAnimation(anim):Play()
+                local bv = Instance.new("BodyVelocity", dashHrp)
+                bv.Velocity = (dashHrp.CFrame * CFrame.Angles(0, math.rad(Dir), 0)).LookVector * Util:GetInt("DashPower")
                 bv.MaxForce = Vector3.new(55555, 1000, 55555)
                 game:GetService("Debris"):AddItem(bv, 0.25)
             end
@@ -285,7 +293,7 @@ local NoClipToggleRef = Misc_Map:Toggle("No-Clip", false, function(State)
     end
 end, "Enables noclip (or disables)")
 
--- Misc: Keybinds — Fly = RightShift, No-Clip = RightAlt (переключают тоглы в UI + уведомления 3 сек)
+-- Misc: Keybinds — Fly = RightShift, No-Clip = Insert (переключают тоглы в UI + уведомления 3 сек)
 local Misc_Keybinds = MiscTab:Section("Keybinds")
 Misc_Keybinds:Keybind("Fly", Enum.KeyCode.RightShift, function()
     if Util:IsTaskRunning("FlyLoop") == nil or not Util:IsTaskRunning("FlyLoop") then
@@ -294,7 +302,7 @@ Misc_Keybinds:Keybind("Fly", Enum.KeyCode.RightShift, function()
         pcall(function() FlyToggleRef:UpdateAsset(false) end)
     end
 end, "Toggle fly")
-Misc_Keybinds:Keybind("No-Clip", Enum.KeyCode.RightAlt, function()
+Misc_Keybinds:Keybind("No-Clip", Enum.KeyCode.Insert, function()
     if Util:IsTaskRunning("No-Clip") == nil or not Util:IsTaskRunning("No-Clip") then
         pcall(function() NoClipToggleRef:UpdateAsset(true) end)
     else
