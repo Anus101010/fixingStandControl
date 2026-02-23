@@ -275,21 +275,13 @@ Misc_Spawn:Button("Reset Spawnpoint", function()
     SpawnpointLabel:UpdateAsset("Spawnpoint: Default")
 end, "Resets spawn point to default")
 
--- Misc: Keybinds — Fly на RightShift (как на скрине). Обработка нажатия RightShift в игре.
+-- Misc: Keybinds — Fly на RightShift (как на скрине)
 local Misc_Keybinds = MiscTab:Section("Keybinds")
 Misc_Keybinds:Keybind("Fly", Enum.KeyCode.RightShift, function()
     local newState = not Util:GetState("Fly")
     setFly(newState)
     pcall(function() FlyToggleRef:UpdateAsset(newState) end)
 end, "Toggle fly")
-game:GetService("UserInputService").InputBegan:Connect(function(Key, Typing)
-    if Typing then return end
-    if Key.KeyCode == Enum.KeyCode.RightShift then
-        local newState = not Util:GetState("Fly")
-        setFly(newState)
-        pcall(function() FlyToggleRef:UpdateAsset(newState) end)
-    end
-end)
 
 pcall(function()
     local gui = game:GetService("CoreGui"):FindFirstChild("XenonV3Lib")
