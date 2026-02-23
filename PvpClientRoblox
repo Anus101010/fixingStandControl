@@ -136,86 +136,79 @@ Player_Section:Toggle("Player ESP", false, function(State)
     end
 end, "Turns on name ESP for players")
 
--- Character Modifications: Player Fly + Fly Speed
+-- Character Modifications: Player Fly + Fly Speed (логика из xenonv3_source)
 local Player_CM = PlayerTab:Section("Character Modifications")
-local Keys_Pressed = { W = 0, A = 0, S = 0, D = 0 }
-local Key_Info = {
-    W = { op = "+", dir = "LookVector" },
-    A = { op = "-", dir = "RightVector" },
-    S = { op = "-", dir = "LookVector" },
-    D = { op = "+", dir = "RightVector" },
-}
-local function getMass(model)
-    local m = 0
-    for _, v in pairs(model:GetDescendants()) do if v:IsA("BasePart") then m = m + v:GetMass() end end
-    return m
-end
-local function mathOp(op, a, b) return op == "-" and (a - b) or (a + b) end
-
-local function setFly(State)
-    if Util:GetState("Fly") == State then return end
-    Util:SetState("Fly", State)
-    if State then
-        Keys_Pressed.W = 0
-        Keys_Pressed.A = 0
-        Keys_Pressed.S = 0
-        Keys_Pressed.D = 0
+local FlyToggleRef = Player_CM:Toggle("Player Fly", false, function(State)
+    if State == true then
+        Library:Notification("Player Fly", "Fly enabled!", 5)
+        local Keys_Pressed = {
+            ["W"] = 0;
+            ["A"] = 0;
+            ["S"] = 0;
+            ["D"] = 0;
+        }
+        local Key_Info = {
+            ["W"] = { ["Operator"] = "+"; ["Direction"] = "LookVector"; };
+            ["A"] = { ["Operator"] = "-"; ["Direction"] = "RightVector"; };
+            ["S"] = { ["Operator"] = "-"; ["Direction"] = "LookVector"; };
+            ["D"] = { ["Operator"] = "+"; ["Direction"] = "RightVector"; };
+        }
         local UIS = game:GetService("UserInputService")
-        if UIS:IsKeyDown(Enum.KeyCode.W) then Keys_Pressed.W = 1 end
-        if UIS:IsKeyDown(Enum.KeyCode.A) then Keys_Pressed.A = 1 end
-        if UIS:IsKeyDown(Enum.KeyCode.S) then Keys_Pressed.S = 1 end
-        if UIS:IsKeyDown(Enum.KeyCode.D) then Keys_Pressed.D = 1 end
-        Util:AddTask("FlyKeyB", UIS.InputBegan:Connect(function(Key, Typing)
+        local function GetKeyFromEnum(enum) return enum.KeyCode.Name end
+        local function GetMass(Model)
+            local Mass = 0
+            for _, v in pairs(Model:GetDescendants()) do if v:IsA("BasePart") then Mass = Mass + v:GetMass() end end
+            return Mass
+        end
+        local function Math(Operator, A, B) if Operator == "-" then return A - B elseif Operator == "+" then return A + B end end
+        if UIS:IsKeyDown(Enum.KeyCode.W) then Keys_Pressed["W"] = 1
+        elseif UIS:IsKeyDown(Enum.KeyCode.A) then Keys_Pressed["A"] = 1
+        elseif UIS:IsKeyDown(Enum.KeyCode.S) then Keys_Pressed["S"] = 1
+        elseif UIS:IsKeyDown(Enum.KeyCode.D) then Keys_Pressed["D"] = 1
+        end
+        Util:AddTask("FlyThingy", UIS.InputBegan:Connect(function(Key, Typing)
             if Typing then return end
-            local k = Key.KeyCode.Name
-            if Keys_Pressed[k] ~= nil then Keys_Pressed[k] = 1 end
+            local Key_String = GetKeyFromEnum(Key)
+            if Keys_Pressed[Key_String] ~= nil then Keys_Pressed[Key_String] = 1 end
         end))
-        Util:AddTask("FlyKeyE", UIS.InputEnded:Connect(function(Key, Typing)
+        Util:AddTask("FlyThingy2", UIS.InputEnded:Connect(function(Key, Typing)
             if Typing then return end
-            local k = Key.KeyCode.Name
-            if Keys_Pressed[k] ~= nil then Keys_Pressed[k] = 0 end
+            local Key_String = GetKeyFromEnum(Key)
+            if Keys_Pressed[Key_String] ~= nil then Keys_Pressed[Key_String] = 0 end
         end))
         Util:AddTask("FlyLoop", game:GetService("RunService").RenderStepped:Connect(function()
-            local horse = Util:GetHorse()
-            local char = Util:GetCharacter()
-            local hrp = Util:GetHRP()
-            if not hrp then return end
-            if not horse or horse.Seat.Occupant ~= char:FindFirstChildWhichIsA("Humanoid") then
+            if Util:GetHorse() == nil or Util:GetHorse().Seat.Occupant ~= Util:GetCharacter():FindFirstChildWhichIsA("Humanoid") then
                 Util:GetHumanoid().WalkSpeed = 0
                 Util:GetHumanoid().JumpPower = 0
-                hrp.CFrame = CFrame.new(hrp.Position, hrp.Position + workspace.CurrentCamera.CFrame.LookVector)
-                local mass = getMass(char)
-                local vel = Vector3.new(0, mass / workspace.Gravity, 0)
-                for key, val in pairs(Keys_Pressed) do
-                    if val == 1 and Key_Info[key] then vel = mathOp(Key_Info[key].op, vel, hrp.CFrame[Key_Info[key].dir] * (Util:GetInt("FlySpeed") * 25) * mass) end
+                Util:GetHRP().CFrame = CFrame.new(Util:GetHRP().Position, Util:GetHRP().Position + workspace.CurrentCamera.CFrame.LookVector)
+                local CharacterMass = GetMass(Util:GetCharacter())
+                local Velocity = Vector3.new(0, CharacterMass / workspace.Gravity, 0)
+                for i, v in pairs(Keys_Pressed) do
+                    if v ~= 0 and Key_Info[i] then Velocity = Math(Key_Info[i].Operator, Velocity, Util:GetHRP().CFrame[Key_Info[i].Direction] * (Util:GetInt("FlySpeed") * 25) * CharacterMass) end
                 end
-                hrp.Velocity = vel
-            else
+                Util:GetHRP().Velocity = Velocity
+            elseif Util:GetHorse() ~= nil and Util:GetHorse().Seat.Occupant == Util:GetCharacter():FindFirstChildWhichIsA("Humanoid") then
+                local horse = Util:GetHorse()
                 horse.Humanoid.WalkSpeed = 0
                 horse.Humanoid.JumpPower = 0
                 if horse:FindFirstChild("Speed") then horse.Speed.Value = 0 end
                 horse.PrimaryPart.CFrame = CFrame.new(horse.PrimaryPart.Position, horse.PrimaryPart.Position + workspace.CurrentCamera.CFrame.LookVector)
-                local mass = getMass(horse)
-                local vel = Vector3.new(0, mass / workspace.Gravity, 0)
-                for key, val in pairs(Keys_Pressed) do
-                    if val == 1 and Key_Info[key] then vel = mathOp(Key_Info[key].op, vel, horse.PrimaryPart.CFrame[Key_Info[key].dir] * (Util:GetInt("FlySpeed") * 25) * mass) end
+                local CharacterMass = GetMass(horse)
+                local Velocity = Vector3.new(0, CharacterMass / workspace.Gravity, 0)
+                for i, v in pairs(Keys_Pressed) do
+                    if v ~= 0 and Key_Info[i] then Velocity = Math(Key_Info[i].Operator, Velocity, horse.PrimaryPart.CFrame[Key_Info[i].Direction] * (Util:GetInt("FlySpeed") * 25) * CharacterMass) end
                 end
-                horse.PrimaryPart.Velocity = vel
-                end
+                horse.PrimaryPart.Velocity = Velocity
+            end
         end))
-        Library:Notification("Player Fly", "Fly enabled!", 1.9)
     else
+        Library:Notification("Player Fly", "Fly disabled!", 5)
         Util:DisconnectTask("FlyLoop")
-        Util:DisconnectTask("FlyKeyB")
-        Util:DisconnectTask("FlyKeyE")
+        Util:DisconnectTask("FlyThingy")
+        Util:DisconnectTask("FlyThingy2")
         local hum = Util:GetHumanoid()
         if hum then hum.WalkSpeed = 16 end
-        Library:Notification("Player Fly", "Fly disabled!", 1.9)
     end
-end
-
-local FlyToggleRef = Player_CM:Toggle("Player Fly", false, function(State)
-    setFly(State)
 end, "Toggles player fly")
 Player_CM:Slider("Fly Speed", 0.1, 1, 0.5, function(V) Util:SetInt("FlySpeed", V) end, true, "changes fly speed")
 
@@ -276,27 +269,15 @@ Misc_Spawn:Button("Reset Spawnpoint", function()
     SpawnpointLabel:UpdateAsset("Spawnpoint: Default")
 end, "Resets spawn point to default")
 
--- Misc: Keybinds — Fly на RightShift (дебаунс чтобы не спамило и не двойное выключение)
+-- Misc: Keybinds — Fly на RightShift (как в xenonv3_source: только переключает тогл в UI)
 local Misc_Keybinds = MiscTab:Section("Keybinds")
-local lastFlyKeyTime = 0
 Misc_Keybinds:Keybind("Fly", Enum.KeyCode.RightShift, function()
-    if tick() - lastFlyKeyTime < 0.5 then return end
-    lastFlyKeyTime = tick()
-    local newState = not Util:GetState("Fly")
-    setFly(newState)
-    pcall(function() FlyToggleRef:UpdateAsset(newState) end)
+    if Util:IsTaskRunning("FlyLoop") == nil or not Util:IsTaskRunning("FlyLoop") then
+        pcall(function() FlyToggleRef:UpdateAsset(true) end)
+    else
+        pcall(function() FlyToggleRef:UpdateAsset(false) end)
+    end
 end, "Toggle fly")
--- Один обработчик RightShift в игре (библиотека иногда не дергает Keybind при фокусе в игре)
-local flyKeyConnection
-flyKeyConnection = game:GetService("UserInputService").InputBegan:Connect(function(Key, Typing)
-    if Typing then return end
-    if Key.KeyCode ~= Enum.KeyCode.RightShift then return end
-    if tick() - lastFlyKeyTime < 0.5 then return end
-    lastFlyKeyTime = tick()
-    local newState = not Util:GetState("Fly")
-    setFly(newState)
-    pcall(function() FlyToggleRef:UpdateAsset(newState) end)
-end)
 
 pcall(function()
     local gui = game:GetService("CoreGui"):FindFirstChild("XenonV3Lib")
