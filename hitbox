@@ -154,23 +154,28 @@ end
     end))
     log("6. Jump hooks OK")
 
-    local OldRaycast = workspace.Raycast
-    workspace.Raycast = function(origin, direction, raycastParams)
-    local result = OldRaycast(origin, direction, raycastParams)
-    if result then return result end
-    if not Util or not Util:GetState("HitboxExpand") then return nil end
-    local char = Util:GetCharacter()
-    local hrp = char and char:FindFirstChild("HumanoidRootPart")
-    if not hrp or (origin - hrp.Position).Magnitude > 15 then return nil end
-    local len = direction.Magnitude
-    if len <= 0 or len > 80 then return nil end
-    local extra = math.clamp(Util:GetInt("HitboxReach") or 0, 0, 52)
-    if extra <= 0 then return nil end
-    local newLen = math.min(len + extra, 80)
-    local newDir = direction.Unit * newLen
-    return OldRaycast(origin, newDir, raycastParams)
+    local raycastMethod
+    local gotRaycast = pcall(function() raycastMethod = workspace.Raycast end)
+    if gotRaycast and raycastMethod and typeof(raycastMethod) == "function" then
+        workspace.Raycast = function(origin, direction, raycastParams)
+            local result = raycastMethod(workspace, origin, direction, raycastParams)
+            if result then return result end
+            if not Util or not Util:GetState("HitboxExpand") then return nil end
+            local char = Util:GetCharacter()
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            if not hrp or (origin - hrp.Position).Magnitude > 15 then return nil end
+            local len = direction.Magnitude
+            if len <= 0 or len > 80 then return nil end
+            local extra = math.clamp(Util:GetInt("HitboxReach") or 0, 0, 52)
+            if extra <= 0 then return nil end
+            local newLen = math.min(len + extra, 80)
+            local newDir = direction.Unit * newLen
+            return raycastMethod(workspace, origin, newDir, raycastParams)
+        end
+        log("7. Raycast hook OK")
+    else
+        log("7. Raycast not in Workspace — Hitbox off")
     end
-    log("7. Raycast hook OK")
     return Library, Util
 end
 
