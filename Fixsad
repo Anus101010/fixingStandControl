@@ -1,4 +1,4 @@
--- Player: Auto Sprint, Player ESP, Character Modifications (Player Fly + Fly Speed)
+-- Player: Auto Sprint, Player ESP, Character Modifications (Fly, Jump)
 -- Misc: Dash, Map (No-Clip), Keybinds (Fly = RightShift, No-Clip = Insert)
 
 local Xenon = { Utils = {} }
@@ -98,6 +98,8 @@ Util.Ints["InfTick"] = { Value = tick() }
 Util.Ints["InfDelay"] = { Value = 1 }
 Util.Ints["DashPower"] = { Value = 50 }
 Util.Ints["FlySpeed"] = { Value = 0.5 }
+Util.States["Jump"] = { Value = false }
+Util.Ints["Jump"] = { Value = 50 }
 
 local Lib = Library.CreateLib()
 local PlayerTab = Lib:Tab("Player", 6023426915)
@@ -220,10 +222,31 @@ local FlyToggleRef = Player_CM:Toggle("Player Fly", false, function(State)
         Util:DisconnectTask("FlyThingy")
         Util:DisconnectTask("FlyThingy2")
         local hum = Util:GetHumanoid()
-        if hum then hum.WalkSpeed = 16 hum.JumpPower = 50 end
+        if hum then
+            hum.WalkSpeed = 16
+            hum.JumpPower = Util:GetState("Jump") and Util:GetInt("Jump") or 50
+        end
     end
 end, "Toggles player fly")
 Player_CM:Slider("Fly Speed", 0.1, 1, 0.5, function(V) Util:SetInt("FlySpeed", V) end, true, "changes fly speed")
+
+-- Jump (xenonv3_source: toggle + slider in Character Modifications)
+Player_CM:Toggle("Jump", false, function(State)
+    Util:SetState("Jump", State)
+    if State then
+        Util:AddTask("JumpLoop", game:GetService("RunService").Heartbeat:Connect(function()
+            local hum = Util:GetHumanoid()
+            if hum then
+                hum.JumpPower = Util:GetInt("Jump")
+            end
+        end))
+    else
+        Util:DisconnectTask("JumpLoop")
+        local hum = Util:GetHumanoid()
+        if hum then hum.JumpPower = 50 end
+    end
+end, "Toggles the jump changer")
+Player_CM:Slider("Jump", 50, 1000, Util:GetInt("Jump"), function(V) Util:SetInt("Jump", V) end, false, "Changes your jump when jump changer is on")
 
 -- Misc: Dash, Map (No-Clip), Keybinds
 local Misc_Dash = MiscTab:Section("Dash")
