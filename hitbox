@@ -1,0 +1,383 @@
+-- Копия Fixingstandcontrol_minimal.lua + Hitbox (расширенная дистанция удара через хук Raycast).
+-- Player: Auto Sprint, Player ESP, Character Modifications (Fly, Jump)
+-- Misc: Hitbox (вкл/выкл + ползунок 0–52)
+-- Misc: Dash, Map (No-Clip), Keybinds (Fly = RightShift, No-Clip = Insert)
+
+local Xenon = { Utils = {} }
+Xenon.__index = Xenon
+Xenon.Utils.__index = Xenon.Utils
+
+local Library = loadstring(game:HttpGet("https://pastebin.com/raw/9YwM8kt6"))()
+
+function Xenon.Utils.MakeUtilController()
+    local Utils = {
+        Tasks = {};
+        Services = {};
+        States = {};
+        Ints = {};
+    }
+    Utils.Services = setmetatable({}, {
+        __index = function(self, service)
+            if rawget(self, service) then return rawget(self, service) end
+            self[service] = game:GetService(service)
+            return self[service]
+        end
+    })
+    return setmetatable(Utils, Xenon.Utils)
+end
+
+function Xenon.Utils:GetService(Service) return self.Services[Service] end
+function Xenon.Utils:GetPlayer() return self:GetService("Players").LocalPlayer end
+function Xenon.Utils:GetCharacter() return self:GetPlayer().Character or self:GetPlayer().CharacterAdded:Wait() end
+function Xenon.Utils:GetHumanoid()
+    local c = self:GetCharacter()
+    return c and c:FindFirstChildWhichIsA("Humanoid")
+end
+function Xenon.Utils:GetHRP()
+    local c = self:GetCharacter()
+    return c and c:FindFirstChild("HumanoidRootPart")
+end
+function Xenon.Utils:GetHorse()
+    local n = self:GetPlayer().Name
+    return workspace:FindFirstChild(n .. "'s Horse")
+end
+function Xenon.Utils:GetState(Value) return self.States[Value] and self.States[Value].Value end
+function Xenon.Utils:SetState(Value, NewValue) if self.States[Value] then self.States[Value].Value = NewValue end end
+function Xenon.Utils:GetInt(Value) return self.Ints[Value] and self.Ints[Value].Value end
+function Xenon.Utils:SetInt(Value, NewValue) if self.Ints[Value] then self.Ints[Value].Value = NewValue end end
+function Xenon.Utils:AddTask(TaskName, Task)
+    if not self.Tasks[TaskName] then self.Tasks[TaskName] = Task end
+    return Task
+end
+function Xenon.Utils:IsTaskRunning(TaskName) return self.Tasks[TaskName] and self.Tasks[TaskName].Connected end
+function Xenon.Utils:DisconnectTask(TaskName)
+    if self:IsTaskRunning(TaskName) then self.Tasks[TaskName]:Disconnect() self.Tasks[TaskName] = nil end
+end
+
+function Xenon.Utils:GetStroke()
+    local Dir, Anim = 180, "6926086304"
+    local UIS = game:GetService("UserInputService")
+    if UIS:IsKeyDown(Enum.KeyCode.A) then Dir, Anim = 90, "6926086567"
+    elseif UIS:IsKeyDown(Enum.KeyCode.D) then Dir, Anim = -90, "6926086883"
+    elseif UIS:IsKeyDown(Enum.KeyCode.W) then Dir, Anim = 0, "6926086032"
+    end
+    return Dir, Anim
+end
+
+function Xenon.Utils:Outline(Chars)
+    local gay = self:GetService("CoreGui"):FindFirstChild("GayESP")
+    if not gay then return end
+    local h = Instance.new("Highlight", gay)
+    h.OutlineColor = Color3.fromRGB(255,255,255)
+    h.Adornee = Chars
+    h.FillColor = Color3.fromRGB(255,255,255)
+    h.FillTransparency = 1
+end
+
+function Xenon.Utils:LabelChar(Chars)
+    local gay = self:GetService("CoreGui"):FindFirstChild("GayESP")
+    if not gay then return end
+    local bg = Instance.new("BillboardGui", gay)
+    local fr = Instance.new("Frame", bg)
+    local lb = Instance.new("TextLabel", fr)
+    bg.Adornee = Chars:WaitForChild("Head")
+    bg.StudsOffset = Vector3.new(0,3,0)
+    bg.AlwaysOnTop = true
+    bg.Size = UDim2.new(4,0,0.5,0)
+    fr.Size = UDim2.new(1,0,1,0)
+    lb.Size = UDim2.new(1,0,1,0)
+    fr.BackgroundTransparency = 1
+    lb.BackgroundTransparency = 1
+    lb.Text = Chars.Name
+    lb.Font = Enum.Font.Ubuntu
+    lb.TextColor3 = Color3.fromRGB(255,255,255)
+end
+
+local Util = Xenon.Utils.MakeUtilController()
+Util.States["Auto Sprinting"] = { Value = false }
+Util.States["Infinite Dash"] = { Value = false }
+Util.Ints["InfTick"] = { Value = tick() }
+Util.Ints["InfDelay"] = { Value = 1 }
+Util.Ints["DashPower"] = { Value = 50 }
+Util.Ints["FlySpeed"] = { Value = 0.5 }
+Util.States["Jump"] = { Value = false }
+Util.Ints["Jump"] = { Value = 50 }
+Util.States["HitboxExpand"] = { Value = false }
+Util.Ints["HitboxReach"] = { Value = 20 }
+
+-- Cache для хука JumpPower (как в xenonv3_source)
+local Cache = { Speed = 16, Jump = 50 }
+
+local OldNewIndex
+OldNewIndex = hookmetamethod(game, "__newindex", newcclosure(function(self, Key, Value, ...)
+    if Key == "JumpPower" then
+        Cache.Jump = Value
+        if Util:GetState("Jump") == true then
+            return OldNewIndex(self, Key, Util:GetInt("Jump"), ...)
+        end
+    end
+    return OldNewIndex(self, Key, Value, ...)
+end))
+
+local OldIndex
+OldIndex = hookmetamethod(game, "__index", newcclosure(function(self, Key, ...)
+    if Key == "JumpPower" then
+        return Cache.Jump
+    end
+    return OldIndex(self, Key, ...)
+end))
+
+-- Hitbox: расширение дистанции лучей от нашего персонажа (мелле-атаки). Игра делает Raycast — при промахе пробуем луч подлиннее.
+local OldRaycast = workspace.Raycast
+workspace.Raycast = function(origin, direction, raycastParams)
+    local result = OldRaycast(origin, direction, raycastParams)
+    if result then return result end
+    if not Util or not Util:GetState("HitboxExpand") then return nil end
+    local char = Util:GetCharacter()
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp or (origin - hrp.Position).Magnitude > 15 then return nil end
+    local len = direction.Magnitude
+    if len <= 0 or len > 80 then return nil end
+    local extra = math.clamp(Util:GetInt("HitboxReach") or 0, 0, 52)
+    if extra <= 0 then return nil end
+    local newLen = math.min(len + extra, 80)
+    local newDir = direction.Unit * newLen
+    return OldRaycast(origin, newDir, raycastParams)
+end
+
+local Lib = Library.CreateLib()
+local PlayerTab = Lib:Tab("Player", 6023426915)
+local MiscTab = Lib:Tab("Misc", 6022668951)
+
+-- Player: Auto Sprint и Player ESP
+local Player_Section = PlayerTab:Section("Player")
+
+Player_Section:Toggle("Auto Sprint", false, function(State)
+    Util:SetState("Auto Sprinting", State)
+    while Util:GetState("Auto Sprinting") == true and Util:GetCharacter() do
+        task.wait()
+        pcall(function()
+            local c = Util:GetCharacter()
+            if c and c:FindFirstChild("RemoteFunction") then
+                local r = c.RemoteFunction:InvokeServer("ReturnSprint")
+                if r and r.IsSprinting ~= true then c.RemoteFunction:InvokeServer("ToggleSprinting") end
+            end
+        end)
+    end
+end, "Toggles auto sprint")
+
+local ESPChrTaskNames = {}
+Player_Section:Toggle("Player ESP", false, function(State)
+    if State then
+        local core = Util:GetService("CoreGui")
+        if not core:FindFirstChild("GayESP") then Instance.new("Folder", core).Name = "GayESP" end
+        for _, v in pairs(Util:GetService("Players"):GetPlayers()) do
+            if v ~= Util:GetPlayer() then
+                local taskName = "Chr_" .. v.UserId
+                Util:AddTask(taskName, v.CharacterAdded:Connect(function(ch) Util:Outline(ch) Util:LabelChar(ch) end))
+                table.insert(ESPChrTaskNames, taskName)
+                if v.Character then Util:Outline(v.Character) Util:LabelChar(v.Character) end
+            end
+        end
+        Util:AddTask("Chr2", Util:GetService("Players").PlayerAdded:Connect(function(p)
+            local taskName = "Chr_" .. p.UserId
+            Util:AddTask(taskName, p.CharacterAdded:Connect(function(ch) Util:Outline(ch) Util:LabelChar(ch) end))
+            table.insert(ESPChrTaskNames, taskName)
+        end))
+    else
+        local g = Util:GetService("CoreGui"):FindFirstChild("GayESP")
+        if g then g:Destroy() end
+        for _, taskName in ipairs(ESPChrTaskNames) do Util:DisconnectTask(taskName) end
+        ESPChrTaskNames = {}
+        Util:DisconnectTask("Chr2")
+    end
+end, "Turns on name ESP for players")
+
+-- Character Modifications: Player Fly, Fly Speed, Jump
+local Player_CM = PlayerTab:Section("Character Modifications")
+local FlyToggleRef = Player_CM:Toggle("Player Fly", false, function(State)
+    if State == true then
+        Library:Notification("Player Fly", "Fly enabled!", 3)
+        local Keys_Pressed = {
+            ["W"] = 0;
+            ["A"] = 0;
+            ["S"] = 0;
+            ["D"] = 0;
+        }
+        local Key_Info = {
+            ["W"] = { ["Operator"] = "+"; ["Direction"] = "LookVector"; };
+            ["A"] = { ["Operator"] = "-"; ["Direction"] = "RightVector"; };
+            ["S"] = { ["Operator"] = "-"; ["Direction"] = "LookVector"; };
+            ["D"] = { ["Operator"] = "+"; ["Direction"] = "RightVector"; };
+        }
+        local UIS = game:GetService("UserInputService")
+        local function GetKeyFromEnum(enum) return enum.KeyCode.Name end
+        local function GetMass(Model)
+            local Mass = 0
+            for _, v in pairs(Model:GetDescendants()) do if v:IsA("BasePart") then Mass = Mass + v:GetMass() end end
+            return Mass
+        end
+        local function Math(Operator, A, B) if Operator == "-" then return A - B elseif Operator == "+" then return A + B end end
+        if UIS:IsKeyDown(Enum.KeyCode.W) then Keys_Pressed["W"] = 1
+        elseif UIS:IsKeyDown(Enum.KeyCode.A) then Keys_Pressed["A"] = 1
+        elseif UIS:IsKeyDown(Enum.KeyCode.S) then Keys_Pressed["S"] = 1
+        elseif UIS:IsKeyDown(Enum.KeyCode.D) then Keys_Pressed["D"] = 1
+        end
+        Util:AddTask("FlyThingy", UIS.InputBegan:Connect(function(Key, Typing)
+            if Typing then return end
+            local Key_String = GetKeyFromEnum(Key)
+            if Keys_Pressed[Key_String] ~= nil then Keys_Pressed[Key_String] = 1 end
+        end))
+        Util:AddTask("FlyThingy2", UIS.InputEnded:Connect(function(Key, Typing)
+            if Typing then return end
+            local Key_String = GetKeyFromEnum(Key)
+            if Keys_Pressed[Key_String] ~= nil then Keys_Pressed[Key_String] = 0 end
+        end))
+        Util:AddTask("FlyLoop", game:GetService("RunService").RenderStepped:Connect(function()
+            local hum, hrp = Util:GetHumanoid(), Util:GetHRP()
+            if not hum or not hrp then return end
+            if Util:GetHorse() == nil or Util:GetHorse().Seat.Occupant ~= Util:GetCharacter():FindFirstChildWhichIsA("Humanoid") then
+                hum.WalkSpeed = 0
+                hum.JumpPower = 0
+                hrp.CFrame = CFrame.new(hrp.Position, hrp.Position + workspace.CurrentCamera.CFrame.LookVector)
+                local CharacterMass = GetMass(Util:GetCharacter())
+                local Velocity = Vector3.new(0, CharacterMass / workspace.Gravity, 0)
+                for i, v in pairs(Keys_Pressed) do
+                    if v ~= 0 and Key_Info[i] then Velocity = Math(Key_Info[i].Operator, Velocity, hrp.CFrame[Key_Info[i].Direction] * (Util:GetInt("FlySpeed") * 25) * CharacterMass) end
+                end
+                hrp.Velocity = Velocity
+            elseif Util:GetHorse() ~= nil and Util:GetHorse().Seat.Occupant == Util:GetCharacter():FindFirstChildWhichIsA("Humanoid") then
+                local horse = Util:GetHorse()
+                horse.Humanoid.WalkSpeed = 0
+                horse.Humanoid.JumpPower = 0
+                if horse:FindFirstChild("Speed") then horse.Speed.Value = 0 end
+                horse.PrimaryPart.CFrame = CFrame.new(horse.PrimaryPart.Position, horse.PrimaryPart.Position + workspace.CurrentCamera.CFrame.LookVector)
+                local CharacterMass = GetMass(horse)
+                local Velocity = Vector3.new(0, CharacterMass / workspace.Gravity, 0)
+                for i, v in pairs(Keys_Pressed) do
+                    if v ~= 0 and Key_Info[i] then Velocity = Math(Key_Info[i].Operator, Velocity, horse.PrimaryPart.CFrame[Key_Info[i].Direction] * (Util:GetInt("FlySpeed") * 25) * CharacterMass) end
+                end
+                horse.PrimaryPart.Velocity = Velocity
+            end
+        end))
+    else
+        Library:Notification("Player Fly", "Fly disabled!", 3)
+        Util:DisconnectTask("FlyLoop")
+        Util:DisconnectTask("FlyThingy")
+        Util:DisconnectTask("FlyThingy2")
+        local hum = Util:GetHumanoid()
+        if hum then
+            hum.WalkSpeed = 16
+            hum.JumpPower = 50
+        end
+    end
+end, "Toggles player fly")
+Player_CM:Slider("Fly Speed", 0.1, 1, 0.5, function(V) Util:SetInt("FlySpeed", V) end, true, "changes fly speed")
+
+Player_CM:Toggle("Jump", false, function(State)
+    Util:SetState("Jump", State)
+    if not State then
+        Cache.Jump = 50
+        local hum = Util:GetHumanoid()
+        if hum then hum.JumpPower = 50 end
+    end
+end, "Toggles the jump changer")
+Player_CM:Slider("Jump", 50, 1000, Util:GetInt("Jump"), function(V) Util:SetInt("Jump", V) end, false, "Changes your jump when jump changer is on")
+
+-- Misc: Dash, Map (No-Clip), Hitbox, Keybinds
+local Misc_Dash = MiscTab:Section("Dash")
+local DashAnimsFolder = Instance.new("Folder", workspace)
+
+Misc_Dash:Toggle("Infinite Dash", false, function(State)
+    Util:SetState("Infinite Dash", State)
+    if Util:GetState("Infinite Dash") == true then
+        Util:AddTask("InfDash", game:GetService("UserInputService").InputBegan:Connect(function(Input, GameProcessed)
+            if GameProcessed then return end
+            local plr = Util:GetPlayer()
+            if not plr.Character then return end
+            local dk = plr:FindFirstChild("PlayerStats") and plr.PlayerStats:FindFirstChild("DashKey")
+            if not dk then return end
+            if Input.KeyCode == Enum.KeyCode[dk.Value] and (tick() - Util:GetInt("InfTick")) >= Util:GetInt("InfDelay") then
+                local dashHum, dashHrp = Util:GetHumanoid(), Util:GetHRP()
+                if not dashHum or not dashHrp then return end
+                Util:SetInt("InfTick", tick())
+                local Dir, AnimId = Util:GetStroke()
+                local anim = Instance.new("Animation", DashAnimsFolder)
+                anim.AnimationId = "rbxassetid://" .. AnimId
+                dashHum:LoadAnimation(anim):Play()
+                local bv = Instance.new("BodyVelocity", dashHrp)
+                bv.Velocity = (dashHrp.CFrame * CFrame.Angles(0, math.rad(Dir), 0)).LookVector * Util:GetInt("DashPower")
+                bv.MaxForce = Vector3.new(55555, 1000, 55555)
+                game:GetService("Debris"):AddItem(bv, 0.25)
+            end
+        end))
+    else
+        Util:DisconnectTask("InfDash")
+    end
+end, "Toggles custom dash")
+
+Misc_Dash:Slider("Dash Power", 10, 1000, 50, function(V) Util:SetInt("DashPower", V) end, false, "Set dash power")
+Misc_Dash:Slider("Dash Delay", 0, 3.5, 1, function(V) Util:SetInt("InfDelay", V) end, true, "Set dash delay")
+
+-- Misc: Hitbox (вкл/выкл + ползунок 0–52)
+local Misc_Hitbox = MiscTab:Section("Hitbox")
+Misc_Hitbox:Toggle("Hitbox", false, function(State)
+    Util:SetState("HitboxExpand", State)
+    Library:Notification("Hitbox", State and "Включено" or "Выключено", 2)
+end, "Включить расширенную дистанцию удара")
+Misc_Hitbox:Slider("Увеличение (0–52)", 0, 52, 20, function(V) Util:SetInt("HitboxReach", V) end, false, "Добавочная дистанция луча в стадах")
+
+local Misc_Map = MiscTab:Section("Map")
+local NoClipToggleRef = Misc_Map:Toggle("No-Clip", false, function(State)
+    if State == true then
+        Library:Notification("No-Clip", "No-Clip enabled!", 3)
+        local NoClipCache = {}
+        local cachedChar = nil
+        Util:AddTask("No-Clip", game:GetService("RunService").RenderStepped:Connect(function()
+            pcall(function()
+                local char = Util:GetCharacter()
+                if not char then return end
+                if cachedChar ~= char then
+                    cachedChar = char
+                    table.clear(NoClipCache)
+                end
+                if #NoClipCache == 0 then
+                    for _, Part in char:GetChildren() do
+                        if Part:IsA("BasePart") or Part:IsA("UnionOperation") then
+                            table.insert(NoClipCache, Part)
+                        end
+                    end
+                end
+                for _, Part in NoClipCache do
+                    if Part.Parent then Part.CanCollide = false end
+                end
+            end)
+        end))
+    else
+        Library:Notification("No-Clip", "No-Clip disabled!", 3)
+        Util:DisconnectTask("No-Clip")
+    end
+end, "Enables noclip (or disables)")
+
+local Misc_Keybinds = MiscTab:Section("Keybinds")
+Misc_Keybinds:Keybind("Fly", Enum.KeyCode.RightShift, function()
+    if Util:IsTaskRunning("FlyLoop") == nil or not Util:IsTaskRunning("FlyLoop") then
+        pcall(function() FlyToggleRef:UpdateAsset(true) end)
+    else
+        pcall(function() FlyToggleRef:UpdateAsset(false) end)
+    end
+end, "Toggle fly")
+Misc_Keybinds:Keybind("No-Clip", Enum.KeyCode.Insert, function()
+    if Util:IsTaskRunning("No-Clip") == nil or not Util:IsTaskRunning("No-Clip") then
+        pcall(function() NoClipToggleRef:UpdateAsset(true) end)
+    else
+        pcall(function() NoClipToggleRef:UpdateAsset(false) end)
+    end
+end, "Toggle noclip")
+
+pcall(function()
+    local gui = game:GetService("CoreGui"):FindFirstChild("XenonV3Lib")
+    if gui and gui:FindFirstChild("TabHolder") and gui.TabHolder:FindFirstChild("Status") then
+        gui.TabHolder.Status.Label.Text = "Status: Loaded! (Hitbox)"
+    end
+end)
