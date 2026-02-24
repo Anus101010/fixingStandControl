@@ -154,11 +154,11 @@ end
     end))
     log("6. Jump hooks OK")
 
-    local raycastMethod
-    local gotRaycast = pcall(function() raycastMethod = workspace.Raycast end)
-    if gotRaycast and raycastMethod and typeof(raycastMethod) == "function" then
+    local raycastOk, raycastErr = pcall(function()
+        local rm = workspace.Raycast
+        if not rm or typeof(rm) ~= "function" then return end
         workspace.Raycast = function(origin, direction, raycastParams)
-            local result = raycastMethod(workspace, origin, direction, raycastParams)
+            local result = rm(workspace, origin, direction, raycastParams)
             if result then return result end
             if not Util or not Util:GetState("HitboxExpand") then return nil end
             local char = Util:GetCharacter()
@@ -170,13 +170,49 @@ end
             if extra <= 0 then return nil end
             local newLen = math.min(len + extra, 80)
             local newDir = direction.Unit * newLen
-            return raycastMethod(workspace, origin, newDir, raycastParams)
+            return rm(workspace, origin, newDir, raycastParams)
         end
-        log("7. Raycast hook OK")
-    else
-        log("7. Raycast not in Workspace — Hitbox off")
-    end
+    end)
+    if raycastOk then log("7. Raycast hook OK") else log("7. Hitbox off: " .. tostring(raycastErr)) end
     return Library, Util
+end
+
+-- Reach: увеличение зоны атаки через масштаб частей (руки, станд). Оригинальные размеры восстанавливаются при выключении.
+local HitboxOriginalSizes = {}
+local function applyReach(on)
+    for part, _ in pairs(HitboxOriginalSizes) do if not part.Parent then HitboxOriginalSizes[part] = nil end end
+    local char = Util and Util:GetCharacter()
+    if not char then return end
+    local reach = math.clamp(Util:GetInt("HitboxReach") or 0, 0, 52)
+    local scale = 1 + (reach / 100)
+    local partsToScale = {}
+    if char:FindFirstChild("RightHand") then table.insert(partsToScale, char.RightHand) end
+    if char:FindFirstChild("LeftHand") then table.insert(partsToScale, char.LeftHand) end
+    if char:FindFirstChild("Right Lower Arm") then table.insert(partsToScale, char["Right Lower Arm"]) end
+    if char:FindFirstChild("Left Lower Arm") then table.insert(partsToScale, char["Left Lower Arm"]) end
+    local stand = char:FindFirstChild("StandMorph")
+    if stand and stand.PrimaryPart then table.insert(partsToScale, stand.PrimaryPart) end
+    if stand then
+        for _, p in pairs(stand:GetDescendants()) do
+            if p:IsA("BasePart") and (p.Name:find("Hand") or p.Name:find("Arm") or p.Name == "HumanoidRootPart") then
+                table.insert(partsToScale, p)
+            end
+        end
+    end
+    for _, part in pairs(partsToScale) do
+        if part.Parent then
+            if on then
+                if not HitboxOriginalSizes[part] then HitboxOriginalSizes[part] = part.Size end
+                part.Size = HitboxOriginalSizes[part] * scale
+            else
+                if HitboxOriginalSizes[part] then
+                    part.Size = HitboxOriginalSizes[part]
+                    HitboxOriginalSizes[part] = nil
+                end
+            end
+        end
+    end
+    if not on then table.clear(HitboxOriginalSizes) end
 end
 
 local Library, Util
@@ -373,9 +409,17 @@ Misc_Dash:Slider("Dash Delay", 0, 3.5, 1, function(V) Util:SetInt("InfDelay", V)
 local Misc_Hitbox = MiscTab:Section("Hitbox")
 Misc_Hitbox:Toggle("Hitbox", false, function(State)
     Util:SetState("HitboxExpand", State)
-    Library:Notification("Hitbox", State and "Включено" or "Выключено", 2)
-end, "Включить расширенную дистанцию удара")
-Misc_Hitbox:Slider("Увеличение (0–52)", 0, 52, 20, function(V) Util:SetInt("HitboxReach", V) end, false, "Добавочная дистанция луча в стадах")
+    if State then
+        Util:AddTask("HitboxReachLoop", game:GetService("RunService").Heartbeat:Connect(function()
+            if Util:GetState("HitboxExpand") then applyReach(true) end
+        end))
+    else
+        Util:DisconnectTask("HitboxReachLoop")
+        applyReach(false)
+    end
+    Library:Notification("Hitbox", State and "Включено (Reach)" or "Выключено", 2)
+end, "Увеличивает зону атаки (Reach) — масштаб рук/станда")
+Misc_Hitbox:Slider("Увеличение (0–52)", 0, 52, 20, function(V) Util:SetInt("HitboxReach", V) end, false, "Сила увеличения зоны удара (0 = без изменений)")
 
 local Misc_Map = MiscTab:Section("Map")
 local NoClipToggleRef = Misc_Map:Toggle("No-Clip", false, function(State)
