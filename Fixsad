@@ -92,8 +92,8 @@ function Xenon.Utils:LabelChar(Chars)
 end
 
 local Util = Xenon.Utils.MakeUtilController()
-Util.States["Auto Sprinting"] = { Value = true }
-Util.States["Infinite Dash"] = { Value = true }
+Util.States["Auto Sprinting"] = { Value = false }
+Util.States["Infinite Dash"] = { Value = false }
 Util.Ints["InfTick"] = { Value = tick() }
 Util.Ints["InfDelay"] = { Value = 0.6 }
 Util.Ints["DashPower"] = { Value = 60 }
@@ -130,7 +130,7 @@ local MiscTab = Lib:Tab("Misc", 6022668951)
 -- Player: только Auto Sprint и Player ESP
 local Player_Section = PlayerTab:Section("Player")
 
-Player_Section:Toggle("Auto Sprint", true, function(State)
+Player_Section:Toggle("Auto Sprint", false, function(State)
     Util:SetState("Auto Sprinting", State)
     while Util:GetState("Auto Sprinting") == true and Util:GetCharacter() do
         task.wait()
@@ -267,7 +267,7 @@ Player_CM:Slider("Jump Power", 50, 1000, Util:GetInt("Jump"), function(V) Util:S
 local Misc_Dash = MiscTab:Section("Dash")
 local DashAnimsFolder = Instance.new("Folder", workspace)
 
-Misc_Dash:Toggle("Infinite Dash", true, function(State)
+Misc_Dash:Toggle("Infinite Dash", false, function(State)
     Util:SetState("Infinite Dash", State)
     if Util:GetState("Infinite Dash") == true then
         Util:AddTask("InfDash", game:GetService("UserInputService").InputBegan:Connect(function(Input, GameProcessed)
