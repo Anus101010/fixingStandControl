@@ -101,6 +101,28 @@ Util.Ints["FlySpeed"] = { Value = 0.5 }
 Util.States["Jump"] = { Value = false }
 Util.Ints["Jump"] = { Value = 50 }
 
+-- Cache для хука JumpPower (как в xenonv3_source): игра при чтении видит нормальное значение — античит не убивает
+local Cache = { Speed = 16, Jump = 50 }
+
+local OldNewIndex
+OldNewIndex = hookmetamethod(game, "__newindex", newcclosure(function(self, Key, Value, ...)
+    if Key == "JumpPower" then
+        Cache.Jump = Value
+        if Util:GetState("Jump") == true then
+            return OldNewIndex(self, Key, Util:GetInt("Jump"), ...)
+        end
+    end
+    return OldNewIndex(self, Key, Value, ...)
+end))
+
+local OldIndex
+OldIndex = hookmetamethod(game, "__index", newcclosure(function(self, Key, ...)
+    if Key == "JumpPower" then
+        return Cache.Jump
+    end
+    return OldIndex(self, Key, ...)
+end))
+
 local Lib = Library.CreateLib()
 local PlayerTab = Lib:Tab("Player", 6023426915)
 local MiscTab = Lib:Tab("Misc", 6022668951)
@@ -224,24 +246,17 @@ local FlyToggleRef = Player_CM:Toggle("Player Fly", false, function(State)
         local hum = Util:GetHumanoid()
         if hum then
             hum.WalkSpeed = 16
-            hum.JumpPower = Util:GetState("Jump") and Util:GetInt("Jump") or 50
+            hum.JumpPower = 50
         end
     end
 end, "Toggles player fly")
 Player_CM:Slider("Fly Speed", 0.1, 1, 0.5, function(V) Util:SetInt("FlySpeed", V) end, true, "changes fly speed")
 
--- Jump (xenonv3_source: toggle + slider in Character Modifications)
+-- Jump (xenonv3_source: через hookmetamethod — запись подменяется, при чтении возвращается Cache.Jump, античит не видит высокий JumpPower)
 Player_CM:Toggle("Jump", false, function(State)
     Util:SetState("Jump", State)
-    if State then
-        Util:AddTask("JumpLoop", game:GetService("RunService").Heartbeat:Connect(function()
-            local hum = Util:GetHumanoid()
-            if hum then
-                hum.JumpPower = Util:GetInt("Jump")
-            end
-        end))
-    else
-        Util:DisconnectTask("JumpLoop")
+    if not State then
+        Cache.Jump = 50
         local hum = Util:GetHumanoid()
         if hum then hum.JumpPower = 50 end
     end
