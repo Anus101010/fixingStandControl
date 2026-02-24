@@ -92,14 +92,14 @@ function Xenon.Utils:LabelChar(Chars)
 end
 
 local Util = Xenon.Utils.MakeUtilController()
-Util.States["Auto Sprinting"] = { Value = false }
-Util.States["Infinite Dash"] = { Value = false }
+Util.States["Auto Sprinting"] = { Value = true }
+Util.States["Infinite Dash"] = { Value = true }
 Util.Ints["InfTick"] = { Value = tick() }
-Util.Ints["InfDelay"] = { Value = 1 }
-Util.Ints["DashPower"] = { Value = 50 }
-Util.Ints["FlySpeed"] = { Value = 0.5 }
+Util.Ints["InfDelay"] = { Value = 0.6 }
+Util.Ints["DashPower"] = { Value = 60 }
+Util.Ints["FlySpeed"] = { Value = 0.6 }
 Util.States["Jump"] = { Value = false }
-Util.Ints["Jump"] = { Value = 50 }
+Util.Ints["Jump"] = { Value = 203 }
 
 -- Cache для хука JumpPower (как в xenonv3_source): игра при чтении видит нормальное значение — античит не убивает
 local Cache = { Speed = 16, Jump = 50 }
@@ -130,7 +130,7 @@ local MiscTab = Lib:Tab("Misc", 6022668951)
 -- Player: только Auto Sprint и Player ESP
 local Player_Section = PlayerTab:Section("Player")
 
-Player_Section:Toggle("Auto Sprint", false, function(State)
+Player_Section:Toggle("Auto Sprint", true, function(State)
     Util:SetState("Auto Sprinting", State)
     while Util:GetState("Auto Sprinting") == true and Util:GetCharacter() do
         task.wait()
@@ -250,7 +250,7 @@ local FlyToggleRef = Player_CM:Toggle("Player Fly", false, function(State)
         end
     end
 end, "Toggles player fly")
-Player_CM:Slider("Fly Speed", 0.1, 1, 0.5, function(V) Util:SetInt("FlySpeed", V) end, true, "changes fly speed")
+Player_CM:Slider("Fly Speed", 0.1, 1, Util:GetInt("FlySpeed"), function(V) Util:SetInt("FlySpeed", V) end, true, "changes fly speed")
 
 -- Jump (xenonv3_source: через hookmetamethod — запись подменяется, при чтении возвращается Cache.Jump, античит не видит высокий JumpPower)
 Player_CM:Toggle("Jump", false, function(State)
@@ -261,13 +261,13 @@ Player_CM:Toggle("Jump", false, function(State)
         if hum then hum.JumpPower = 50 end
     end
 end, "Toggles the jump changer")
-Player_CM:Slider("Jump", 50, 1000, Util:GetInt("Jump"), function(V) Util:SetInt("Jump", V) end, false, "Changes your jump when jump changer is on")
+Player_CM:Slider("Jump Power", 50, 1000, Util:GetInt("Jump"), function(V) Util:SetInt("Jump", V) end, false, "Changes your jump power when jump changer is on")
 
 -- Misc: Dash, Map (No-Clip), Keybinds
 local Misc_Dash = MiscTab:Section("Dash")
 local DashAnimsFolder = Instance.new("Folder", workspace)
 
-Misc_Dash:Toggle("Infinite Dash", false, function(State)
+Misc_Dash:Toggle("Infinite Dash", true, function(State)
     Util:SetState("Infinite Dash", State)
     if Util:GetState("Infinite Dash") == true then
         Util:AddTask("InfDash", game:GetService("UserInputService").InputBegan:Connect(function(Input, GameProcessed)
@@ -295,8 +295,8 @@ Misc_Dash:Toggle("Infinite Dash", false, function(State)
     end
 end, "Toggles custom dash")
 
-Misc_Dash:Slider("Dash Power", 10, 1000, 50, function(V) Util:SetInt("DashPower", V) end, false, "Set dash power")
-Misc_Dash:Slider("Dash Delay", 0, 3.5, 1, function(V) Util:SetInt("InfDelay", V) end, true, "Set dash delay")
+Misc_Dash:Slider("Dash Power", 10, 1000, Util:GetInt("DashPower"), function(V) Util:SetInt("DashPower", V) end, false, "Set dash power")
+Misc_Dash:Slider("Dash Delay", 0, 3.5, Util:GetInt("InfDelay"), function(V) Util:SetInt("InfDelay", V) end, true, "Set dash delay")
 
 -- Misc: Map — No-Clip из xenonv3_source (Destroy Map не добавляем)
 local Misc_Map = MiscTab:Section("Map")
