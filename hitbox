@@ -1,0 +1,339 @@
+-- Minimal IY: GUI + Hitbox only (from infiniteyield source)
+if not game:IsLoaded() then game.Loaded:Wait() end
+
+local cloneref = function(...) return ... end
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local CoreGui = game:GetService("CoreGui")
+
+local PlayerGui = Players.LocalPlayer:FindFirstChildWhichIsA("PlayerGui")
+local COREGUI = CoreGui or PlayerGui
+local IYMouse = Players.LocalPlayer:GetMouse()
+
+function randomString()
+	local length = math.random(10, 20)
+	local array = {}
+	for i = 1, length do array[i] = string.char(math.random(32, 126)) end
+	return table.concat(array)
+end
+
+-- PARENT
+local PARENT
+do
+	local Main = Instance.new("ScreenGui")
+	Main.Name = randomString()
+	Main.ResetOnSpawn = false
+	Main.DisplayOrder = 2147483647
+	if get_hidden_gui then
+		Main.Parent = get_hidden_gui()
+	elseif gethui then
+		Main.Parent = gethui()
+	elseif syn and syn.protect_gui then
+		syn.protect_gui(Main)
+		Main.Parent = COREGUI
+	else
+		Main.Parent = COREGUI
+	end
+	PARENT = Main
+end
+
+-- GUI
+local ScaledHolder = Instance.new("Frame")
+ScaledHolder.Name = randomString()
+ScaledHolder.Size = UDim2.fromScale(1, 1)
+ScaledHolder.BackgroundTransparency = 1
+ScaledHolder.Parent = PARENT
+
+local Holder = Instance.new("Frame")
+Holder.Name = randomString()
+Holder.Parent = ScaledHolder
+Holder.Active = true
+Holder.BackgroundColor3 = Color3.fromRGB(46, 46, 47)
+Holder.BorderSizePixel = 0
+Holder.Position = UDim2.new(1, -250, 1, -220)
+Holder.Size = UDim2.new(0, 250, 0, 220)
+Holder.ZIndex = 10
+
+local Title = Instance.new("TextLabel")
+Title.Name = "Title"
+Title.Parent = Holder
+Title.Active = true
+Title.BackgroundColor3 = Color3.fromRGB(36, 36, 37)
+Title.BorderSizePixel = 0
+Title.Size = UDim2.new(0, 250, 0, 20)
+Title.Font = Enum.Font.SourceSans
+Title.TextSize = 18
+Title.Text = "Hitbox GUI"
+Title.TextColor3 = Color3.new(1, 1, 1)
+Title.ZIndex = 10
+
+local Dark = Instance.new("Frame")
+Dark.Name = "Dark"
+Dark.Parent = Holder
+Dark.Active = true
+Dark.BackgroundColor3 = Color3.fromRGB(36, 36, 37)
+Dark.BorderSizePixel = 0
+Dark.Position = UDim2.new(0, 0, 0, 45)
+Dark.Size = UDim2.new(0, 250, 0, 175)
+Dark.ZIndex = 10
+
+local Cmdbar = Instance.new("TextBox")
+Cmdbar.Name = "Cmdbar"
+Cmdbar.Parent = Holder
+Cmdbar.BackgroundTransparency = 1
+Cmdbar.BorderSizePixel = 0
+Cmdbar.Position = UDim2.new(0, 5, 0, 20)
+Cmdbar.Size = UDim2.new(0, 240, 0, 25)
+Cmdbar.Font = Enum.Font.SourceSans
+Cmdbar.TextSize = 18
+Cmdbar.TextXAlignment = Enum.TextXAlignment.Left
+Cmdbar.TextColor3 = Color3.new(1, 1, 1)
+Cmdbar.Text = ""
+Cmdbar.ZIndex = 10
+Cmdbar.PlaceholderText = "Command Bar"
+
+local CMDsF = Instance.new("ScrollingFrame")
+CMDsF.Name = "CMDs"
+CMDsF.Parent = Holder
+CMDsF.BackgroundTransparency = 1
+CMDsF.BorderSizePixel = 0
+CMDsF.Position = UDim2.new(0, 5, 0, 45)
+CMDsF.Size = UDim2.new(0, 245, 0, 175)
+CMDsF.CanvasSize = UDim2.new(0, 0, 0, 0)
+CMDsF.ScrollBarThickness = 8
+CMDsF.ZIndex = 10
+
+local cmdListLayout = Instance.new("UIListLayout")
+cmdListLayout.Parent = CMDsF
+
+local prefix = ";"
+Cmdbar.PlaceholderText = "Command Bar (" .. prefix .. ")"
+
+-- Helpers
+function getRoot(char)
+	if char and char:FindFirstChildOfClass("Humanoid") then
+		return char:FindFirstChildOfClass("Humanoid").RootPart
+	end
+	return nil
+end
+
+function notify(title, text)
+	task.spawn(function()
+		local f = Instance.new("Frame")
+		f.Size = UDim2.new(0, 250, 0, 80)
+		f.Position = UDim2.new(1, -260, 1, -100)
+		f.BackgroundColor3 = Color3.fromRGB(36, 36, 37)
+		f.BorderSizePixel = 0
+		f.ZIndex = 100
+		f.Parent = PARENT
+		local t = Instance.new("TextLabel")
+		t.Size = UDim2.new(1, -10, 1, -10)
+		t.Position = UDim2.new(0, 5, 0, 5)
+		t.BackgroundTransparency = 1
+		t.Text = (title and title .. "\n" or "") .. (text or "")
+		t.TextColor3 = Color3.new(1, 1, 1)
+		t.TextWrapped = true
+		t.Font = Enum.Font.SourceSans
+		t.TextSize = 14
+		t.ZIndex = 100
+		t.Parent = f
+		wait(3)
+		if f and f.Parent then f:Destroy() end
+	end)
+end
+
+-- Command system
+function splitString(str, delim)
+	delim = delim or ","
+	local broken = {}
+	for w in string.gmatch(str, "[^" .. delim .. "]+") do table.insert(broken, w) end
+	return broken
+end
+
+function toTokens(str)
+	local tokens = {}
+	for op, name in string.gmatch(str, "([+-])([^+-]+)") do
+		table.insert(tokens, { Operator = op, Name = name })
+	end
+	return tokens
+end
+
+function onlyIncludeInTable(tab, matches)
+	local matchTable = {}
+	local resultTable = {}
+	for i, v in pairs(matches) do matchTable[v.Name] = true end
+	for i, v in pairs(tab) do if matchTable[v.Name] then table.insert(resultTable, v) end end
+	return resultTable
+end
+
+function removeTableMatches(tab, matches)
+	local matchTable = {}
+	local resultTable = {}
+	for i, v in pairs(matches) do matchTable[v.Name] = true end
+	for i, v in pairs(tab) do if not matchTable[v.Name] then table.insert(resultTable, v) end end
+	return resultTable
+end
+
+function getPlayersByName(Name)
+	local NameLow, Len, Found = string.lower(Name), #Name, {}
+	for _, v in pairs(Players:GetPlayers()) do
+		if Name:sub(1, 1) == "@" then
+			if string.sub(string.lower(v.Name), 1, Len - 1) == NameLow:sub(2) then
+				table.insert(Found, v)
+			end
+		else
+			if string.sub(string.lower(v.Name), 1, Len) == NameLow or string.sub(string.lower(v.DisplayName or ""), 1, Len) == NameLow then
+				table.insert(Found, v)
+			end
+		end
+	end
+	return Found
+end
+
+SpecialPlayerCases = {
+	["all"] = function(speaker) return Players:GetPlayers() end,
+	["others"] = function(speaker)
+		local plrs = {}
+		for i, v in pairs(Players:GetPlayers()) do
+			if v ~= speaker then table.insert(plrs, v) end
+		end
+		return plrs
+	end,
+	["me"] = function(speaker) return { speaker } end,
+}
+
+function getPlayer(list, speaker)
+	if list == nil then return { speaker.Name } end
+	local nameList = splitString(list, ",")
+	local foundList = {}
+	for _, name in pairs(nameList) do
+		if string.sub(name, 1, 1) ~= "+" and string.sub(name, 1, 1) ~= "-" then name = "+" .. name end
+		local tokens = toTokens(name)
+		local initialPlayers = Players:GetPlayers()
+		for i, v in pairs(tokens) do
+			if v.Operator == "+" then
+				local tokenContent = v.Name
+				local foundCase = false
+				for regex, case in pairs(SpecialPlayerCases) do
+					local matches = { string.match(tokenContent, "^" .. regex .. "$") }
+					if #matches > 0 then
+						foundCase = true
+						initialPlayers = onlyIncludeInTable(initialPlayers, case(speaker, matches, initialPlayers))
+						break
+					end
+				end
+				if not foundCase then
+					initialPlayers = onlyIncludeInTable(initialPlayers, getPlayersByName(tokenContent))
+				end
+			else
+				local tokenContent = v.Name
+				local foundCase = false
+				for regex, case in pairs(SpecialPlayerCases) do
+					local matches = { string.match(tokenContent, "^" .. regex .. "$") }
+					if #matches > 0 then
+						foundCase = true
+						initialPlayers = removeTableMatches(initialPlayers, case(speaker, matches, initialPlayers))
+						break
+					end
+				end
+				if not foundCase then
+					initialPlayers = removeTableMatches(initialPlayers, getPlayersByName(tokenContent))
+				end
+			end
+		end
+		for i, v in pairs(initialPlayers) do table.insert(foundList, v) end
+	end
+	local foundNames = {}
+	for i, v in pairs(foundList) do table.insert(foundNames, v.Name) end
+	return foundNames
+end
+
+function FindInTable(tbl, val)
+	if tbl == nil then return false end
+	for _, v in pairs(tbl) do if v == val then return true end end
+	return false
+end
+
+function getstring(begin, args)
+	return table.concat(args or cargs, " ", begin)
+end
+
+local cmds = {}
+local cargs = {}
+local cmdHistory = {}
+local lastCmds = {}
+
+function findCmd(cmd_name)
+	for i, v in pairs(cmds) do
+		if v.NAME:lower() == cmd_name:lower() or FindInTable(v.ALIAS, cmd_name:lower()) then
+			return v
+		end
+	end
+	return nil
+end
+
+function execCmd(cmdStr, speaker, store)
+	cmdStr = cmdStr:gsub("%s+$", "")
+	task.spawn(function()
+		local rawCmdStr = cmdStr
+		local args = splitString(cmdStr, " ")
+		local cmdName = args[1]
+		local cmd = findCmd(cmdName)
+		if cmd then
+			table.remove(args, 1)
+			cargs = args
+			speaker = speaker or Players.LocalPlayer
+			if store and speaker == Players.LocalPlayer then
+				if (not cmdHistory[1] or cmdHistory[1] ~= rawCmdStr) then
+					table.insert(cmdHistory, 1, rawCmdStr)
+				end
+				if #cmdHistory > 30 then table.remove(cmdHistory) end
+				lastCmds[cmdName] = cmdStr
+			end
+			local ok, err = pcall(function() cmd.FUNC(args, speaker) end)
+			if not ok then warn("Command Error:", cmdName, err) end
+		end
+	end)
+end
+
+function addcmd(name, alias, func)
+	cmds[#cmds + 1] = { NAME = name, ALIAS = alias or {}, FUNC = func }
+end
+
+-- Hitbox command
+addcmd("hitbox", {}, function(args, speaker)
+	local players = getPlayer(args[1], speaker)
+	local transparency = args[3] and tonumber(args[3]) or 0.4
+	for i, v in pairs(players) do
+		local plr = Players[v]
+		if plr and plr ~= speaker and getRoot(plr.Character) then
+			local sizeArg = tonumber(args[2])
+			local Size = sizeArg and Vector3.new(sizeArg, sizeArg, sizeArg) or Vector3.new(2, 1, 1)
+			local Root = getRoot(plr.Character)
+			if Root:IsA("BasePart") then
+				Root.CanCollide = false
+				Root.Size = Size
+				Root.Transparency = transparency
+			end
+		end
+	end
+	notify("Hitbox", "Applied to " .. (args[1] or "all"))
+end)
+
+-- Input
+IYMouse.KeyDown:Connect(function(Key)
+	if Key == prefix then
+		RunService.RenderStepped:Wait()
+		Cmdbar:CaptureFocus()
+	end
+end)
+
+Cmdbar.FocusLost:Connect(function(enterPressed)
+	if enterPressed then
+		local cmdbarText = Cmdbar.Text:gsub("^" .. prefix, "")
+		execCmd(cmdbarText, Players.LocalPlayer, true)
+	end
+	if not Cmdbar:IsFocused() then Cmdbar.Text = "" end
+end)
