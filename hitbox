@@ -1,13 +1,41 @@
--- Копия Fixingstandcontrol_minimal.lua + Hitbox (расширенная дистанция удара через хук Raycast).
--- Player: Auto Sprint, Player ESP, Character Modifications (Fly, Jump)
--- Misc: Hitbox (вкл/выкл + ползунок 0–52)
--- Misc: Dash, Map (No-Clip), Keybinds (Fly = RightShift, No-Clip = Insert)
+-- Копия Fixingstandcontrol_minimal.lua + Hitbox. Логи в консоль (Output) и в workspace.
+local function log(msg)
+    local s = "[Fixsad] " .. tostring(msg)
+    print(s)
+    pcall(function()
+        local folder = workspace:FindFirstChild("FixsadLogs")
+        if not folder then folder = Instance.new("Folder", workspace) folder.Name = "FixsadLogs" end
+        local part = folder:FindFirstChild("Log") or Instance.new("Part", folder)
+        part.Name = "Log"
+        part.Anchored = true
+        part.CanCollide = false
+        part.Transparency = 1
+        part.Position = Vector3.new(0, 0, 0)
+        local billboard = part:FindFirstChild("BB") or Instance.new("BillboardGui", part)
+        billboard.Name = "BB"
+        billboard.Adornee = part
+        billboard.Size = UDim2.new(40, 0, 10, 0)
+        billboard.StudsOffset = Vector3.new(0, 0, 0)
+        local label = billboard:FindFirstChild("T") or Instance.new("TextLabel", billboard)
+        label.Name = "T"
+        label.Size = UDim2.new(1, 0, 1, 0)
+        label.BackgroundTransparency = 1
+        label.Text = (label.Text or "") .. "\n" .. s
+        label.TextScaled = true
+        label.TextWrapped = true
+    end)
+end
 
-local Xenon = { Utils = {} }
-Xenon.__index = Xenon
-Xenon.Utils.__index = Xenon.Utils
+local function main()
+    log("1. Start")
+    local Xenon = { Utils = {} }
+    Xenon.__index = Xenon
+    Xenon.Utils.__index = Xenon.Utils
 
-local Library = loadstring(game:HttpGet("https://pastebin.com/raw/9YwM8kt6"))()
+    log("2. Loading Library...")
+    local Library = loadstring(game:HttpGet("https://pastebin.com/raw/9YwM8kt6"))()
+    if not Library or not Library.CreateLib then error("Library load failed") end
+    log("3. Library OK")
 
 function Xenon.Utils.MakeUtilController()
     local Utils = {
@@ -93,43 +121,41 @@ function Xenon.Utils:LabelChar(Chars)
     lb.TextColor3 = Color3.fromRGB(255,255,255)
 end
 
-local Util = Xenon.Utils.MakeUtilController()
-Util.States["Auto Sprinting"] = { Value = false }
-Util.States["Infinite Dash"] = { Value = false }
-Util.Ints["InfTick"] = { Value = tick() }
-Util.Ints["InfDelay"] = { Value = 1 }
-Util.Ints["DashPower"] = { Value = 50 }
-Util.Ints["FlySpeed"] = { Value = 0.5 }
-Util.States["Jump"] = { Value = false }
-Util.Ints["Jump"] = { Value = 50 }
-Util.States["HitboxExpand"] = { Value = false }
-Util.Ints["HitboxReach"] = { Value = 20 }
+    log("4. Creating Util...")
+    local Util = Xenon.Utils.MakeUtilController()
+    Util.States["Auto Sprinting"] = { Value = false }
+    Util.States["Infinite Dash"] = { Value = false }
+    Util.Ints["InfTick"] = { Value = tick() }
+    Util.Ints["InfDelay"] = { Value = 1 }
+    Util.Ints["DashPower"] = { Value = 50 }
+    Util.Ints["FlySpeed"] = { Value = 0.5 }
+    Util.States["Jump"] = { Value = false }
+    Util.Ints["Jump"] = { Value = 50 }
+    Util.States["HitboxExpand"] = { Value = false }
+    Util.Ints["HitboxReach"] = { Value = 20 }
+    log("5. Util OK")
 
--- Cache для хука JumpPower (как в xenonv3_source)
-local Cache = { Speed = 16, Jump = 50 }
-
-local OldNewIndex
-OldNewIndex = hookmetamethod(game, "__newindex", newcclosure(function(self, Key, Value, ...)
-    if Key == "JumpPower" then
-        Cache.Jump = Value
-        if Util:GetState("Jump") == true then
-            return OldNewIndex(self, Key, Util:GetInt("Jump"), ...)
+    local Cache = { Speed = 16, Jump = 50 }
+    local OldNewIndex, OldIndex
+    local newc = (typeof(newcclosure) == "function" and newcclosure) or function(f) return f end
+    log("5b. Setting Jump hooks...")
+    OldNewIndex = hookmetamethod(game, "__newindex", newc(function(self, Key, Value, ...)
+        if Key == "JumpPower" then
+            Cache.Jump = Value
+            if Util:GetState("Jump") == true then
+                return OldNewIndex(self, Key, Util:GetInt("Jump"), ...)
+            end
         end
-    end
-    return OldNewIndex(self, Key, Value, ...)
-end))
+        return OldNewIndex(self, Key, Value, ...)
+    end))
+    OldIndex = hookmetamethod(game, "__index", newc(function(self, Key, ...)
+        if Key == "JumpPower" then return Cache.Jump end
+        return OldIndex(self, Key, ...)
+    end))
+    log("6. Jump hooks OK")
 
-local OldIndex
-OldIndex = hookmetamethod(game, "__index", newcclosure(function(self, Key, ...)
-    if Key == "JumpPower" then
-        return Cache.Jump
-    end
-    return OldIndex(self, Key, ...)
-end))
-
--- Hitbox: расширение дистанции лучей от нашего персонажа (мелле-атаки). Игра делает Raycast — при промахе пробуем луч подлиннее.
-local OldRaycast = workspace.Raycast
-workspace.Raycast = function(origin, direction, raycastParams)
+    local OldRaycast = workspace.Raycast
+    workspace.Raycast = function(origin, direction, raycastParams)
     local result = OldRaycast(origin, direction, raycastParams)
     if result then return result end
     if not Util or not Util:GetState("HitboxExpand") then return nil end
@@ -143,8 +169,27 @@ workspace.Raycast = function(origin, direction, raycastParams)
     local newLen = math.min(len + extra, 80)
     local newDir = direction.Unit * newLen
     return OldRaycast(origin, newDir, raycastParams)
+    end
+    log("7. Raycast hook OK")
+    return Library, Util
 end
 
+local Library, Util
+do
+    local ok, err = pcall(function()
+        Library, Util = main()
+    end)
+    if not ok then
+        log("FATAL: " .. tostring(err))
+        warn(debug.traceback())
+        return
+    end
+    if not Library or not Util then
+        log("FATAL: main() returned nil")
+        return
+    end
+end
+log("8. Creating GUI...")
 local Lib = Library.CreateLib()
 local PlayerTab = Lib:Tab("Player", 6023426915)
 local MiscTab = Lib:Tab("Misc", 6022668951)
@@ -381,3 +426,4 @@ pcall(function()
         gui.TabHolder.Status.Label.Text = "Status: Loaded! (Hitbox)"
     end
 end)
+log("9. Done.")
