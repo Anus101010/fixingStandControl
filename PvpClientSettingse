@@ -165,14 +165,14 @@ Player_Section:Toggle("Player ESP", false, function(State)
         for _, v in pairs(Util:GetService("Players"):GetPlayers()) do
             if v ~= Util:GetPlayer() then
                 local taskName = "Chr_" .. v.UserId
-                Util:AddTask(taskName, v.CharacterAdded:Connect(function(ch) pcall(function() Util:Outline(ch) Util:LabelChar(ch) end) end))
+                Util:AddTask(taskName, v.CharacterAdded:Connect(function(ch) Util:Outline(ch) Util:LabelChar(ch) end))
                 table.insert(ESPChrTaskNames, taskName)
-                if v.Character then pcall(function() Util:Outline(v.Character) Util:LabelChar(v.Character) end) end
+                if v.Character then Util:Outline(v.Character) Util:LabelChar(v.Character) end
             end
         end
         Util:AddTask("Chr2", Util:GetService("Players").PlayerAdded:Connect(function(p)
             local taskName = "Chr_" .. p.UserId
-            Util:AddTask(taskName, p.CharacterAdded:Connect(function(ch) pcall(function() Util:Outline(ch) Util:LabelChar(ch) end) end))
+            Util:AddTask(taskName, p.CharacterAdded:Connect(function(ch) Util:Outline(ch) Util:LabelChar(ch) end))
             table.insert(ESPChrTaskNames, taskName)
         end))
     else
@@ -239,28 +239,23 @@ local FlyToggleRef = Player_CM:Toggle("Player Fly", false, function(State)
                 hum.JumpPower = 0
                 hrp.CFrame = CFrame.new(hrp.Position, hrp.Position + workspace.CurrentCamera.CFrame.LookVector)
                 local CharacterMass = GetMass(Util:GetCharacter())
-                local grav = math.max(workspace.Gravity, 0.1)
-                local Velocity = Vector3.new(0, CharacterMass / grav, 0)
+                local Velocity = Vector3.new(0, CharacterMass / workspace.Gravity, 0)
                 for i, v in pairs(Keys_Pressed) do
                     if v ~= 0 and Key_Info[i] then Velocity = Math(Key_Info[i].Operator, Velocity, hrp.CFrame[Key_Info[i].Direction] * (Util:GetInt("FlySpeed") * 25) * CharacterMass) end
                 end
                 hrp.Velocity = Velocity
             elseif Util:GetHorse() ~= nil and Util:GetHorse().Seat.Occupant == Util:GetCharacter():FindFirstChildWhichIsA("Humanoid") then
                 local horse = Util:GetHorse()
-                local horseHum = horse:FindFirstChildWhichIsA("Humanoid")
-                local horsePart = horse.PrimaryPart
-                if not horseHum or not horsePart then return end
-                horseHum.WalkSpeed = 0
-                horseHum.JumpPower = 0
+                horse.Humanoid.WalkSpeed = 0
+                horse.Humanoid.JumpPower = 0
                 if horse:FindFirstChild("Speed") then horse.Speed.Value = 0 end
-                horsePart.CFrame = CFrame.new(horsePart.Position, horsePart.Position + workspace.CurrentCamera.CFrame.LookVector)
+                horse.PrimaryPart.CFrame = CFrame.new(horse.PrimaryPart.Position, horse.PrimaryPart.Position + workspace.CurrentCamera.CFrame.LookVector)
                 local CharacterMass = GetMass(horse)
-                local grav = math.max(workspace.Gravity, 0.1)
-                local Velocity = Vector3.new(0, CharacterMass / grav, 0)
+                local Velocity = Vector3.new(0, CharacterMass / workspace.Gravity, 0)
                 for i, v in pairs(Keys_Pressed) do
-                    if v ~= 0 and Key_Info[i] then Velocity = Math(Key_Info[i].Operator, Velocity, horsePart.CFrame[Key_Info[i].Direction] * (Util:GetInt("FlySpeed") * 25) * CharacterMass) end
+                    if v ~= 0 and Key_Info[i] then Velocity = Math(Key_Info[i].Operator, Velocity, horse.PrimaryPart.CFrame[Key_Info[i].Direction] * (Util:GetInt("FlySpeed") * 25) * CharacterMass) end
                 end
-                horsePart.Velocity = Velocity
+                horse.PrimaryPart.Velocity = Velocity
             end
         end))
     else
@@ -301,8 +296,7 @@ Misc_Dash:Toggle("Infinite Dash", false, function(State)
             if not plr.Character then return end
             local dk = plr:FindFirstChild("PlayerStats") and plr.PlayerStats:FindFirstChild("DashKey")
             if not dk then return end
-            local ok, keyCode = pcall(function() return Enum.KeyCode[dk.Value] end)
-            if ok and keyCode and Input.KeyCode == keyCode and (tick() - Util:GetInt("InfTick")) >= Util:GetInt("InfDelay") then
+            if Input.KeyCode == Enum.KeyCode[dk.Value] and (tick() - Util:GetInt("InfTick")) >= Util:GetInt("InfDelay") then
                 local dashHum, dashHrp = Util:GetHumanoid(), Util:GetHRP()
                 if not dashHum or not dashHrp then return end
                 Util:SetInt("InfTick", tick())
