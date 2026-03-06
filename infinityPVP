@@ -96,7 +96,6 @@ end
 local Util = Xenon.Utils.MakeUtilController()
 Util.States["Auto Sprinting"] = { Value = false }
 Util.States["Infinite Dash"] = { Value = false }
-Util.States["No Damage"] = { Value = false }
 Util.Ints["InfTick"] = { Value = tick() }
 Util.Ints["InfDelay"] = { Value = 0.6 }
 Util.Ints["DashPower"] = { Value = 60 }
@@ -143,22 +142,6 @@ local MiscTab = Lib:Tab("Misc", 6022668951)
 
 -- Player: только Auto Sprint и Player ESP
 local Player_Section = PlayerTab:Section("Player")
-
-Player_Section:Toggle("No Damage", false, function(State)
-    Util:SetState("No Damage", State)
-    if State then
-        local rs = game:GetService("RunService")
-        Util:AddTask("NoDamageLoop", rs.Heartbeat:Connect(function()
-            if not Util:GetState("No Damage") then return end
-            local hum = Util:GetHumanoid()
-            if hum and hum.Health < hum.MaxHealth then
-                hum.Health = hum.MaxHealth
-            end
-        end))
-    else
-        Util:DisconnectTask("NoDamageLoop")
-    end
-end, "While enabled, your health is forced to max every frame")
 
 Player_Section:Toggle("Auto Sprint", false, function(State)
     Util:SetState("Auto Sprinting", State)
