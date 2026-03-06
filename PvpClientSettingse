@@ -183,7 +183,7 @@ Player_Section:Toggle("Player ESP", false, function(State)
 end, "Turns on name ESP for players")
 
 -- Character Modifications: Speed (из xenonv3_source), Player Fly, Jump
-local Player_CM = PlayerTab:Section("Character Modifications (Speed, Fly, Jump)")
+local Player_CM = PlayerTab:Section("Character Modifications")
 Player_CM:Toggle("Speed", false, function(State)
     Util:SetState("Speed", State)
     if not State then
