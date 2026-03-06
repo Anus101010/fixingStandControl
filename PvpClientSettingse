@@ -1,5 +1,5 @@
 -- Player: Auto Sprint, Player ESP, Character Modifications (Speed, Fly, Jump)
--- Misc: Dash, Map (No-Clip), Keybinds (Fly = RightShift, No-Clip = Insert)
+-- Misc: Dash, Map (No-Clip), Keybinds (Speed = K, Fly = RightShift, No-Clip = Insert)
 
 local Xenon = { Utils = {} }
 Xenon.__index = Xenon
@@ -165,14 +165,14 @@ Player_Section:Toggle("Player ESP", false, function(State)
         for _, v in pairs(Util:GetService("Players"):GetPlayers()) do
             if v ~= Util:GetPlayer() then
                 local taskName = "Chr_" .. v.UserId
-                Util:AddTask(taskName, v.CharacterAdded:Connect(function(ch) Util:Outline(ch) Util:LabelChar(ch) end))
+                Util:AddTask(taskName, v.CharacterAdded:Connect(function(ch) pcall(function() Util:Outline(ch) Util:LabelChar(ch) end) end))
                 table.insert(ESPChrTaskNames, taskName)
-                if v.Character then Util:Outline(v.Character) Util:LabelChar(v.Character) end
+                if v.Character then pcall(function() Util:Outline(v.Character) Util:LabelChar(v.Character) end) end
             end
         end
         Util:AddTask("Chr2", Util:GetService("Players").PlayerAdded:Connect(function(p)
             local taskName = "Chr_" .. p.UserId
-            Util:AddTask(taskName, p.CharacterAdded:Connect(function(ch) Util:Outline(ch) Util:LabelChar(ch) end))
+            Util:AddTask(taskName, p.CharacterAdded:Connect(function(ch) pcall(function() Util:Outline(ch) Util:LabelChar(ch) end) end))
             table.insert(ESPChrTaskNames, taskName)
         end))
     else
@@ -186,7 +186,7 @@ end, "Turns on name ESP for players")
 
 -- Character Modifications: Speed (из xenonv3_source), Player Fly, Jump
 local Player_CM = PlayerTab:Section("Character Modifications")
-Player_CM:Toggle("Speed", false, function(State)
+local SpeedToggleRef = Player_CM:Toggle("Speed", false, function(State)
     Util:SetState("Speed", State)
 end, "Toggles the speed changer")
 Player_CM:Slider("Speed", 16, 333, Util:GetInt("Speed"), function(Num)
@@ -239,23 +239,28 @@ local FlyToggleRef = Player_CM:Toggle("Player Fly", false, function(State)
                 hum.JumpPower = 0
                 hrp.CFrame = CFrame.new(hrp.Position, hrp.Position + workspace.CurrentCamera.CFrame.LookVector)
                 local CharacterMass = GetMass(Util:GetCharacter())
-                local Velocity = Vector3.new(0, CharacterMass / workspace.Gravity, 0)
+                local grav = math.max(workspace.Gravity, 0.1)
+                local Velocity = Vector3.new(0, CharacterMass / grav, 0)
                 for i, v in pairs(Keys_Pressed) do
                     if v ~= 0 and Key_Info[i] then Velocity = Math(Key_Info[i].Operator, Velocity, hrp.CFrame[Key_Info[i].Direction] * (Util:GetInt("FlySpeed") * 25) * CharacterMass) end
                 end
                 hrp.Velocity = Velocity
             elseif Util:GetHorse() ~= nil and Util:GetHorse().Seat.Occupant == Util:GetCharacter():FindFirstChildWhichIsA("Humanoid") then
                 local horse = Util:GetHorse()
-                horse.Humanoid.WalkSpeed = 0
-                horse.Humanoid.JumpPower = 0
+                local horseHum = horse:FindFirstChildWhichIsA("Humanoid")
+                local horsePart = horse.PrimaryPart
+                if not horseHum or not horsePart then return end
+                horseHum.WalkSpeed = 0
+                horseHum.JumpPower = 0
                 if horse:FindFirstChild("Speed") then horse.Speed.Value = 0 end
-                horse.PrimaryPart.CFrame = CFrame.new(horse.PrimaryPart.Position, horse.PrimaryPart.Position + workspace.CurrentCamera.CFrame.LookVector)
+                horsePart.CFrame = CFrame.new(horsePart.Position, horsePart.Position + workspace.CurrentCamera.CFrame.LookVector)
                 local CharacterMass = GetMass(horse)
-                local Velocity = Vector3.new(0, CharacterMass / workspace.Gravity, 0)
+                local grav = math.max(workspace.Gravity, 0.1)
+                local Velocity = Vector3.new(0, CharacterMass / grav, 0)
                 for i, v in pairs(Keys_Pressed) do
-                    if v ~= 0 and Key_Info[i] then Velocity = Math(Key_Info[i].Operator, Velocity, horse.PrimaryPart.CFrame[Key_Info[i].Direction] * (Util:GetInt("FlySpeed") * 25) * CharacterMass) end
+                    if v ~= 0 and Key_Info[i] then Velocity = Math(Key_Info[i].Operator, Velocity, horsePart.CFrame[Key_Info[i].Direction] * (Util:GetInt("FlySpeed") * 25) * CharacterMass) end
                 end
-                horse.PrimaryPart.Velocity = Velocity
+                horsePart.Velocity = Velocity
             end
         end))
     else
@@ -296,7 +301,8 @@ Misc_Dash:Toggle("Infinite Dash", false, function(State)
             if not plr.Character then return end
             local dk = plr:FindFirstChild("PlayerStats") and plr.PlayerStats:FindFirstChild("DashKey")
             if not dk then return end
-            if Input.KeyCode == Enum.KeyCode[dk.Value] and (tick() - Util:GetInt("InfTick")) >= Util:GetInt("InfDelay") then
+            local ok, keyCode = pcall(function() return Enum.KeyCode[dk.Value] end)
+            if ok and keyCode and Input.KeyCode == keyCode and (tick() - Util:GetInt("InfTick")) >= Util:GetInt("InfDelay") then
                 local dashHum, dashHrp = Util:GetHumanoid(), Util:GetHRP()
                 if not dashHum or not dashHrp then return end
                 Util:SetInt("InfTick", tick())
@@ -351,8 +357,15 @@ local NoClipToggleRef = Misc_Map:Toggle("No-Clip", false, function(State)
     end
 end, "Enables noclip (or disables)")
 
--- Misc: Keybinds — Fly = RightShift, No-Clip = Insert (переключают тоглы в UI + уведомления 3 сек)
+-- Misc: Keybinds — Speed = K, Fly = RightShift, No-Clip = Insert (переключают тоглы в UI + уведомления 3 сек)
 local Misc_Keybinds = MiscTab:Section("Keybinds")
+Misc_Keybinds:Keybind("Speed", Enum.KeyCode.K, function()
+    if Util:GetState("Speed") then
+        pcall(function() SpeedToggleRef:UpdateAsset(false) end)
+    else
+        pcall(function() SpeedToggleRef:UpdateAsset(true) end)
+    end
+end, "Toggle speed")
 Misc_Keybinds:Keybind("Fly", Enum.KeyCode.RightShift, function()
     if Util:IsTaskRunning("FlyLoop") == nil or not Util:IsTaskRunning("FlyLoop") then
         pcall(function() FlyToggleRef:UpdateAsset(true) end)
