@@ -1,5 +1,5 @@
 -- Player: Auto Sprint, Player ESP, Character Modifications (Speed, Fly, Jump)
--- Misc: Dash, Map (No-Clip), Keybinds (Speed = K, Fly = RightShift, No-Clip = Insert)
+-- Misc: Dash, Map (No-Clip), Keybinds (Speed = L, Fly = RightShift, No-Clip = Insert)
 
 local Xenon = { Utils = {} }
 Xenon.__index = Xenon
@@ -108,17 +108,18 @@ Util.Ints["Speed"] = { Value = 42 }
 -- Cache для хука: при чтении возвращаем последнее значение, которое игра записала. Стартуем с 16/50 — иначе античит видит 42 до первой записи и убивает при инжекте.
 local Cache = { Speed = 16, Jump = 50 }
 
+-- При записи 0 (пилот C-Moon, стан и т.п.) не подменяем — иначе игра убивает. Как в xenonv3_source по смыслу.
 local OldNewIndex
 OldNewIndex = hookmetamethod(game, "__newindex", newcclosure(function(self, Key, Value, ...)
     if Key == "WalkSpeed" then
         Cache.Speed = Value
-        if Util:GetState("Speed") == true then
+        if Util:GetState("Speed") == true and Value ~= 0 then
             return OldNewIndex(self, Key, Util:GetInt("Speed"), ...)
         end
     end
     if Key == "JumpPower" then
         Cache.Jump = Value
-        if Util:GetState("Jump") == true then
+        if Util:GetState("Jump") == true and Value ~= 0 then
             return OldNewIndex(self, Key, Util:GetInt("Jump"), ...)
         end
     end
@@ -353,7 +354,7 @@ end, "Enables noclip (or disables)")
 
 -- Misc: Keybinds — Speed = K, Fly = RightShift, No-Clip = Insert (переключают тоглы в UI + уведомления 3 сек)
 local Misc_Keybinds = MiscTab:Section("Keybinds")
-Misc_Keybinds:Keybind("Speed", Enum.KeyCode.K, function()
+Misc_Keybinds:Keybind("Speed", Enum.KeyCode.L, function()
     if Util:GetState("Speed") then
         pcall(function() SpeedToggleRef:UpdateAsset(false) end)
     else
