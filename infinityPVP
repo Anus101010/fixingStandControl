@@ -1,5 +1,5 @@
 -- Player: Auto Sprint, Player ESP, Character Modifications (Speed, Fly, Jump)
--- Misc: Dash, Map (No-Clip), Keybinds (Speed = K, Fly = RightShift, No-Clip = Insert)
+-- Misc: Dash, Map (No-Clip), Keybinds (Speed = L, Fly = RightShift, No-Clip = Insert)
 
 local Xenon = { Utils = {} }
 Xenon.__index = Xenon
@@ -353,7 +353,7 @@ end, "Enables noclip (or disables)")
 
 -- Misc: Keybinds — Speed = K, Fly = RightShift, No-Clip = Insert (переключают тоглы в UI + уведомления 3 сек)
 local Misc_Keybinds = MiscTab:Section("Keybinds")
-Misc_Keybinds:Keybind("Speed", Enum.KeyCode.K, function()
+Misc_Keybinds:Keybind("Speed", Enum.KeyCode.L, function()
     if Util:GetState("Speed") then
         pcall(function() SpeedToggleRef:UpdateAsset(false) end)
     else
