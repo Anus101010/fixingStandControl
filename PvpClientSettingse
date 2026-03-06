@@ -291,17 +291,24 @@ Player_CM:Slider("Jump Power", 50, 1000, Util:GetInt("Jump"), function(V) Util:S
 -- Misc: Dash, Map (No-Clip), Keybinds
 local Misc_Dash = MiscTab:Section("Dash")
 local DashAnimsFolder = Instance.new("Folder", workspace)
+local DashKeyBackup = nil
 
 Misc_Dash:Toggle("Infinite Dash", false, function(State)
     Util:SetState("Infinite Dash", State)
     if Util:GetState("Infinite Dash") == true then
+        Util:DisconnectTask("InfDash")
         Util:AddTask("InfDash", game:GetService("UserInputService").InputBegan:Connect(function(Input, GameProcessed)
             if GameProcessed then return end
             local plr = Util:GetPlayer()
             if not plr.Character then return end
             local dk = plr:FindFirstChild("PlayerStats") and plr.PlayerStats:FindFirstChild("DashKey")
             if not dk then return end
-            local ok, keyCode = pcall(function() return Enum.KeyCode[dk.Value] end)
+            if DashKeyBackup == nil then
+                DashKeyBackup = dk.Value
+                -- Prevent "double dash": disable game's own dash key while our dash is enabled.
+                pcall(function() dk.Value = "F24" end)
+            end
+            local ok, keyCode = pcall(function() return Enum.KeyCode[DashKeyBackup] end)
             if ok and keyCode and Input.KeyCode == keyCode and (tick() - Util:GetInt("InfTick")) >= Util:GetInt("InfDelay") then
                 local dashHum, dashHrp = Util:GetHumanoid(), Util:GetHRP()
                 if not dashHum or not dashHrp then return end
@@ -318,6 +325,12 @@ Misc_Dash:Toggle("Infinite Dash", false, function(State)
         end))
     else
         Util:DisconnectTask("InfDash")
+        local plr = Util:GetPlayer()
+        local dk = plr and plr:FindFirstChild("PlayerStats") and plr.PlayerStats:FindFirstChild("DashKey")
+        if dk and DashKeyBackup ~= nil then
+            pcall(function() dk.Value = DashKeyBackup end)
+        end
+        DashKeyBackup = nil
     end
 end, "Toggles custom dash")
 
