@@ -75,10 +75,12 @@ end
 function Xenon.Utils:LabelChar(Chars)
     local gay = self:GetService("CoreGui"):FindFirstChild("GayESP")
     if not gay then return end
+    local head = Chars:FindFirstChild("Head") or Chars:WaitForChild("Head", 2)
+    if not head then return end
     local bg = Instance.new("BillboardGui", gay)
     local fr = Instance.new("Frame", bg)
     local lb = Instance.new("TextLabel", fr)
-    bg.Adornee = Chars:WaitForChild("Head")
+    bg.Adornee = head
     bg.StudsOffset = Vector3.new(0,3,0)
     bg.AlwaysOnTop = true
     bg.Size = UDim2.new(4,0,0.5,0)
@@ -186,11 +188,6 @@ end, "Turns on name ESP for players")
 local Player_CM = PlayerTab:Section("Character Modifications")
 Player_CM:Toggle("Speed", false, function(State)
     Util:SetState("Speed", State)
-    if not State then
-        Cache.Speed = 16
-        local hum = Util:GetHumanoid()
-        if hum then hum.WalkSpeed = 16 end
-    end
 end, "Toggles the speed changer")
 Player_CM:Slider("Speed", 16, 333, Util:GetInt("Speed"), function(Num)
     Util:SetInt("Speed", Num)
