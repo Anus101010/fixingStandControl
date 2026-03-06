@@ -103,10 +103,10 @@ Util.Ints["FlySpeed"] = { Value = 0.6 }
 Util.States["Jump"] = { Value = false }
 Util.Ints["Jump"] = { Value = 203 }
 Util.States["Speed"] = { Value = false }
-Util.Ints["Speed"] = { Value = 16 }
+Util.Ints["Speed"] = { Value = 42 }
 
 -- Cache для хука WalkSpeed/JumpPower (как в xenonv3_source): игра при чтении видит нормальное значение — античит не убивает
-local Cache = { Speed = 16, Jump = 50 }
+local Cache = { Speed = 42, Jump = 50 }
 
 local OldNewIndex
 OldNewIndex = hookmetamethod(game, "__newindex", newcclosure(function(self, Key, Value, ...)
