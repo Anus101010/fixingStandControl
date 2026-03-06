@@ -137,6 +137,35 @@ OldIndex = hookmetamethod(game, "__index", newcclosure(function(self, Key, ...)
     return OldIndex(self, Key, ...)
 end))
 
+-- Блокируем Reset от игры (смерть при пилоте C-Moon и т.п.). Свой ресет — через ReplaceReset с флагом XENON_ON_TOP (как в xenonv3_source).
+local OldNamecall
+OldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
+    local args = {...}
+    local method = getnamecallmethod and getnamecallmethod() or ""
+    if (method == "FireServer" or method == "InvokeServer" or method == "InvokeClient") and args[1] == "Reset" and args[3] ~= "XENON_ON_TOP" then
+        return task.wait(9e9)
+    end
+    return OldNamecall(self, ...)
+end))
+
+function Xenon.Utils:ReplaceReset()
+    local NewEvent = Instance.new("BindableEvent")
+    NewEvent.Event:Connect(function()
+        local c = self:GetCharacter()
+        if c and c:FindFirstChild("RemoteEvent") then
+            c.RemoteEvent:FireServer("Reset", {Anchored = false}, "XENON_ON_TOP")
+        end
+    end)
+    pcall(function()
+        self:GetService("StarterGui"):SetCore("ResetButtonCallback", NewEvent)
+    end)
+end
+
+Util:ReplaceReset()
+Util:GetPlayer().CharacterAdded:Connect(function()
+    Util:ReplaceReset()
+end)
+
 local Lib = Library.CreateLib()
 local PlayerTab = Lib:Tab("Player", 6023426915)
 local MiscTab = Lib:Tab("Misc", 6022668951)
